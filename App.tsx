@@ -272,7 +272,7 @@ const AdminPanel: React.FC<{
 
       {activeTab === 'productos' && (
         <div className="space-y-6">
-          <button onClick={() => setEditingProduct({ nombre: '', precio: 0, stock: 0, departamento: 'carnes', unidad: 'kg', disponible: true })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Producto</button>
+          <button onClick={() => setEditingProduct({ nombre: '', precio: 0, stock: 0, departamento: 'carnes' as any, unidad: 'kg', disponible: true })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Producto</button>
           <div className="glassmorphism rounded-[2.5rem] overflow-hidden shadow-sm border border-white">
             <table className="w-full text-left">
               <thead className="bg-primary/5 text-[10px] uppercase font-black text-primary/30"><tr className="p-4"><th></th><th className="p-4">Producto</th><th>Depto</th><th>Precio</th><th className="p-4 text-center">Acciones</th></tr></thead>
@@ -297,7 +297,7 @@ const AdminPanel: React.FC<{
 
       {activeTab === 'depts' && (
         <div className="space-y-6">
-           <button onClick={() => setEditingDept({ nombre: '', slug: 'nuevo' as any, telefono_whatsapp: '', color_hex: '#3d4a3e' })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Depto</button>
+           <button onClick={() => setEditingDept({ nombre: '', slug: 'carnes' as any, telefono_whatsapp: '', color_hex: '#3d4a3e' })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Depto</button>
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
              {departments.map(d => (
                <div key={d.id} className="glassmorphism p-6 rounded-[2rem] border-t-8 border-white shadow-sm" style={{ borderTopColor: d.color_hex }}>
@@ -376,23 +376,34 @@ const App: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [pData, dData, cData] = await Promise.all([
+      // Intenta cargar datos en paralelo. Si getConfig falla, no debería detener toda la app.
+      const results = await Promise.allSettled([
         db.getProducts(),
         db.getDepartments(),
         db.getConfig()
       ]);
+
+      const pData = results[0].status === 'fulfilled' ? results[0].value : [];
+      const dData = results[1].status === 'fulfilled' ? results[1].value : [];
+      const cData = results[2].status === 'fulfilled' ? results[2].value : null;
+
+      if (results[0].status === 'rejected') throw results[0].reason;
+      if (results[1].status === 'rejected') throw results[1].reason;
+
       setProducts(pData || []);
       setDepartments(dData || []);
       if (cData) setConfig(cData);
-    } catch (e) { 
-      console.error(e);
-      setError("No se pudo conectar con Supabase. Revisa las variables de entorno.");
+    } catch (e: any) { 
+      console.error("Refresh Data Error:", e);
+      setError(e.message || "No se pudo conectar con Supabase. Revisa las variables de entorno en Vercel.");
     } finally { 
       setLoading(false); 
     }
   };
 
-  useEffect(() => { refreshData(); }, []);
+  useEffect(() => { 
+    refreshData(); 
+  }, []);
 
   const addToCart = (p: Product) => {
     if (cart.length > 0 && cart[0].departamento !== p.departamento) {
@@ -444,13 +455,14 @@ const App: React.FC = () => {
       const waUrl = `https://wa.me/${deptInfo?.telefono_whatsapp || config.whatsapp_general}?text=${encodeURIComponent(text)}`;
       window.open(waUrl, '_blank');
     } catch (e) {
-      console.error(e);
-      alert("Error al guardar el pedido.");
+      console.error("Save Order Error:", e);
+      alert("Error al guardar el pedido. Revisa tu conexión.");
     }
   };
 
   const totalCart = cart.reduce((acc, i) => acc + i.quantity, 0);
 
+  // Renderizado condicional robusto
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-offwhite">
@@ -469,9 +481,12 @@ const App: React.FC = () => {
         <WifiOff className="text-red-400" size={80} />
         <h2 className="text-3xl font-black text-red-600">Error de Conexión</h2>
         <p className="max-w-md text-red-500 font-medium">{error}</p>
-        <button onClick={refreshData} className="bg-red-600 text-white px-10 py-4 rounded-2xl font-black flex items-center gap-2">
-          <RefreshCcw size={24} /> Reintentar
-        </button>
+        <div className="flex flex-col gap-4">
+          <button onClick={refreshData} className="bg-red-600 text-white px-10 py-4 rounded-2xl font-black flex items-center gap-2">
+            <RefreshCcw size={24} /> Reintentar
+          </button>
+          <button onClick={() => window.location.reload()} className="text-red-400 font-bold underline">Cargar de nuevo</button>
+        </div>
       </div>
     );
   }
@@ -480,14 +495,34 @@ const App: React.FC = () => {
     <HashRouter>
       <div className="min-h-screen bg-offwhite selection:bg-accent selection:text-white pb-32">
         <main className="max-w-7xl mx-auto">
-          {view === 'home' && <HomeView products={products} departments={departments} onAddToCart={addToCart} config={config} />}
-          {view === 'admin' && isAuth && <AdminPanel products={products} departments={departments} config={config} onRefresh={refreshData} onLogout={() => { setIsAuth(false); setView('home'); }} />}
+          {view === 'home' && (
+            <HomeView 
+              products={products} 
+              departments={departments} 
+              onAddToCart={addToCart} 
+              config={config} 
+            />
+          )}
+          
+          {view === 'admin' && isAuth && (
+            <AdminPanel 
+              products={products} 
+              departments={departments} 
+              config={config} 
+              onRefresh={refreshData} 
+              onLogout={() => { setIsAuth(false); setView('home'); }} 
+            />
+          )}
+
           {view === 'login' && (
             <div className="min-h-screen flex items-center justify-center p-6 animate-fade-in">
                <form onSubmit={(e) => {
                  e.preventDefault();
                  const fd = new FormData(e.currentTarget);
-                 if (fd.get('u')==='jjtovar1006' && fd.get('p')==='Apamate.25'){ setIsAuth(true); setView('admin'); }
+                 if (fd.get('u')==='jjtovar1006' && fd.get('p')==='Apamate.25'){ 
+                   setIsAuth(true); 
+                   setView('admin'); 
+                 }
                  else { alert("Credenciales incorrectas."); }
                }} className="glassmorphism p-12 rounded-[3rem] w-full max-w-md space-y-8 shadow-2xl border border-white">
                  <div className="text-center">
@@ -502,11 +537,15 @@ const App: React.FC = () => {
                </form>
             </div>
           )}
+
           {view === 'cart' && (
              <div className="px-6 py-20 max-w-2xl mx-auto animate-fade-in">
                 <h2 className="text-4xl font-black mb-10 text-primary">Tu Carrito</h2>
                 {cart.length === 0 ? (
-                  <div className="text-center py-20"><ShoppingBag className="mx-auto text-primary/5 mb-4" size={80} /><p className="text-primary/20 font-black">Tu bolsa está vacía.</p></div>
+                  <div className="text-center py-20">
+                    <ShoppingBag className="mx-auto text-primary/5 mb-4" size={80} />
+                    <p className="text-primary/20 font-black">Tu bolsa está vacía.</p>
+                  </div>
                 ) : (
                   <div className="space-y-4">
                      {cart.map(i => (
@@ -525,13 +564,19 @@ const App: React.FC = () => {
                        </div>
                      ))}
                      <div className="p-10 glassmorphism rounded-[2.5rem] mt-10 shadow-xl border border-white">
-                        <div className="flex justify-between items-center font-black text-4xl mb-6 text-primary tracking-tighter"><span>Total:</span> <span>${cart.reduce((a,b) => a+(b.precio*b.quantity), 0).toFixed(2)}</span></div>
-                        <button onClick={() => setView('checkout')} className="w-full bg-primary text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-2xl hover:bg-accent transition-all">Continuar <ArrowRight size={24} /></button>
+                        <div className="flex justify-between items-center font-black text-4xl mb-6 text-primary tracking-tighter">
+                          <span>Total:</span> 
+                          <span>${cart.reduce((a,b) => a+(b.precio*b.quantity), 0).toFixed(2)}</span>
+                        </div>
+                        <button onClick={() => setView('checkout')} className="w-full bg-primary text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-2xl hover:bg-accent transition-all">
+                          Continuar <ArrowRight size={24} />
+                        </button>
                      </div>
                   </div>
                 )}
              </div>
           )}
+
           {view === 'checkout' && (
             <div className="px-6 py-20 max-w-xl mx-auto animate-fade-in">
               <h2 className="text-3xl font-black mb-8">Datos de Envío</h2>
@@ -553,14 +598,23 @@ const App: React.FC = () => {
                 <div className="glassmorphism p-6 rounded-[2rem] border border-white shadow-sm">
                   <h3 className="text-xs font-black uppercase text-primary/30 mb-4 tracking-widest">Entrega</h3>
                   <div className="grid grid-cols-2 gap-4">
-                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer"><input type="radio" name="e" value="retiro" defaultChecked /><span className="font-bold">Retiro</span></label>
-                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer"><input type="radio" name="e" value="delivery" /><span className="font-bold">Delivery</span></label>
+                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer">
+                      <input type="radio" name="e" value="retiro" defaultChecked className="accent-primary" />
+                      <span className="font-bold">Retiro</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer">
+                      <input type="radio" name="e" value="delivery" className="accent-primary" />
+                      <span className="font-bold">Delivery</span>
+                    </label>
                   </div>
                 </div>
-                <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl">Finalizar Pedido</button>
+                <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl">
+                  Finalizar Pedido
+                </button>
               </form>
             </div>
           )}
+
           {view === 'success' && currentOrder && (
             <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-fade-in">
                <div className="w-32 h-32 bg-green-50 rounded-full flex items-center justify-center mb-10 shadow-inner border border-green-100"><CheckCircle2 size={80} className="text-green-500" /></div>
@@ -570,6 +624,7 @@ const App: React.FC = () => {
             </div>
           )}
         </main>
+
         <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md glassmorphism rounded-full px-10 py-5 flex items-center justify-between shadow-2xl z-50 border border-white/40">
           <button onClick={() => setView('home')} className={`p-2 transition-all duration-300 ${view === 'home' ? 'text-accent scale-125' : 'text-primary/30'}`}><TrendingUp size={28} /></button>
           <button onClick={() => setView('cart')} className={`p-2 relative transition-all duration-300 ${view === 'cart' ? 'text-accent scale-125' : 'text-primary/30'}`}>

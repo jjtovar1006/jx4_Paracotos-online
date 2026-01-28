@@ -1,14 +1,21 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Acceso seguro a variables de entorno con fallbacks
-const getEnv = (key: string, fallback: string) => {
+// Helper robusto para obtener variables de entorno en el navegador
+const getEnv = (key: string, fallback: string): string => {
   try {
-    // En Vercel/Browser, buscamos en window.process.env inyectado por el shim
-    return (window as any).process?.env?.[key] || fallback;
+    // Intenta obtener de process.env (inyectado por build tool o shim)
+    if (typeof process !== 'undefined' && process.env && process.env[key]) {
+      return process.env[key] as string;
+    }
+    // Intenta obtener de window.process.env (shim manual)
+    if ((window as any).process?.env?.[key]) {
+      return (window as any).process.env[key];
+    }
   } catch (e) {
-    return fallback;
+    console.warn(`Error accediendo a la variable ${key}:`, e);
   }
+  return fallback;
 };
 
 const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://lgdixakavpqlxgltzuei.supabase.co');
@@ -47,7 +54,11 @@ export const db = {
     return data || [];
   },
   upsertProduct: async (product: any) => {
-    const { data, error } = await supabase.from('products').upsert(product).select();
+    // Asegurarse de no enviar el id si es nuevo
+    const payload = { ...product };
+    if (!payload.id) delete payload.id;
+    
+    const { data, error } = await supabase.from('products').upsert(payload).select();
     if (error) throw error;
     return data;
   },
@@ -61,7 +72,10 @@ export const db = {
     return data || [];
   },
   upsertDepartment: async (dept: any) => {
-    const { data, error } = await supabase.from('departments').upsert(dept).select();
+    const payload = { ...dept };
+    if (!payload.id) delete payload.id;
+
+    const { data, error } = await supabase.from('departments').upsert(payload).select();
     if (error) throw error;
     return data;
   },
@@ -75,7 +89,7 @@ export const db = {
       if (error && error.code !== 'PGRST116') throw error;
       return data;
     } catch (e) {
-      console.warn("Config no encontrada, usando valores por defecto.");
+      console.warn("Config no encontrada en Supabase, usando valores por defecto.");
       return null;
     }
   },

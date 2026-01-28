@@ -6,8 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JX4 Paracotos v11.0</title>
   <script>
-    // Shim para evitar errores de process is not defined en el navegador
-    window.process = window.process || { env: {} };
+    // Shim completo para asegurar que React y otras librerías encuentren el objeto process
+    window.process = {
+      env: {
+        NODE_ENV: 'production'
+      }
+    };
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
