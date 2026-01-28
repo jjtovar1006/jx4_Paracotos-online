@@ -6,7 +6,8 @@ import {
   LayoutDashboard, Search, ChevronRight, TrendingUp, Package, 
   Settings, Upload, LogIn, LogOut,
   Truck, Store, Bike, Car, HardHat, Save, X, Edit3, AlertCircle,
-  Image as ImageIcon, Loader2, RefreshCcw, Clipboard, ExternalLink
+  Image as ImageIcon, Loader2, RefreshCcw, Clipboard, ExternalLink,
+  WifiOff
 } from 'lucide-react';
 
 import { Product, CartItem, DepartmentSlug, Order, Config, Department } from './types';
@@ -90,8 +91,7 @@ const HomeView: React.FC<{
   departments: Department[];
   onAddToCart: (p: Product) => void;
   config: Config;
-  loading: boolean;
-}> = ({ products, departments, onAddToCart, config, loading }) => {
+}> = ({ products, departments, onAddToCart, config }) => {
   const [selectedDept, setSelectedDept] = useState<string | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -99,15 +99,8 @@ const HomeView: React.FC<{
     return products.filter(p => (selectedDept === 'all' || p.departamento === selectedDept) && p.nombre.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [products, selectedDept, searchQuery]);
 
-  if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <Loader2 className="animate-spin text-accent" size={48} />
-      <p className="font-black text-primary/20 uppercase tracking-widest text-xs">Cargando JX4 Paracotos...</p>
-    </div>
-  );
-
   return (
-    <div className="pb-32">
+    <div className="pb-32 animate-fade-in">
       <div className="bg-primary text-white py-2 px-4 text-center overflow-hidden whitespace-nowrap">
         <p className="text-xs font-bold animate-pulse">{config.cintillo_promocional}</p>
       </div>
@@ -144,8 +137,8 @@ const HomeView: React.FC<{
       </div>
 
       <div className="px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {filtered.map(p => (
-          <div key={p.id} className="glassmorphism rounded-[2rem] overflow-hidden group hover:-translate-y-1 transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-primary/5">
+        {filtered.length > 0 ? filtered.map(p => (
+          <div key={p.id} className="glassmorphism rounded-[2rem] overflow-hidden group hover:-translate-y-1 transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-primary/5 border border-white">
             <div className="aspect-square relative overflow-hidden bg-white">
               <img src={p.imagen_url} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
               <div className="absolute top-3 right-3"><Badge variant="primary">{p.unidad.toUpperCase()}</Badge></div>
@@ -164,7 +157,12 @@ const HomeView: React.FC<{
               </div>
             </div>
           </div>
-        ))}
+        )) : (
+          <div className="col-span-full py-20 text-center">
+            <Package className="mx-auto text-primary/10 mb-4" size={64} />
+            <p className="font-bold text-primary/30">No se encontraron productos en esta categoría.</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -211,7 +209,7 @@ const AdminPanel: React.FC<{
   };
 
   return (
-    <div className="px-6 py-10 max-w-6xl mx-auto pb-32">
+    <div className="px-6 py-10 max-w-6xl mx-auto pb-32 animate-fade-in">
       <header className="flex justify-between items-center mb-10">
         <div>
           <h2 className="text-3xl font-black">Super Administrador</h2>
@@ -259,10 +257,10 @@ const AdminPanel: React.FC<{
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-4">
               <ImageUploader label="Logo" currentUrl={localConfig.logo_url} onUpload={(url) => setLocalConfig({...localConfig, logo_url: url})} />
-              <input className="w-full bg-white p-4 rounded-xl border border-primary/5" value={localConfig.slogan} onChange={e => setLocalConfig({...localConfig, slogan: e.target.value})} placeholder="Slogan" />
+              <input className="w-full bg-white p-4 rounded-xl border border-primary/5 font-bold" value={localConfig.slogan} onChange={e => setLocalConfig({...localConfig, slogan: e.target.value})} placeholder="Slogan" />
             </div>
             <div className="space-y-4">
-              <input className="w-full bg-white p-4 rounded-xl border border-primary/5" value={localConfig.cintillo_promocional} onChange={e => setLocalConfig({...localConfig, cintillo_promocional: e.target.value})} placeholder="Cintillo" />
+              <input className="w-full bg-white p-4 rounded-xl border border-primary/5 font-bold" value={localConfig.cintillo_promocional} onChange={e => setLocalConfig({...localConfig, cintillo_promocional: e.target.value})} placeholder="Cintillo" />
               <input type="number" className="w-full bg-white p-4 rounded-xl border border-primary/5 font-black text-accent" value={localConfig.tasa_cambio} onChange={e => setLocalConfig({...localConfig, tasa_cambio: parseFloat(e.target.value)})} placeholder="Tasa" />
             </div>
           </div>
@@ -316,7 +314,8 @@ const AdminPanel: React.FC<{
            </div>
         </div>
       )}
-
+      
+      {/* Modales Crud */}
       {editingProduct && (
         <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
@@ -331,11 +330,11 @@ const AdminPanel: React.FC<{
                  <input placeholder="Precio" type="number" className="bg-offwhite p-4 rounded-2xl border border-primary/5 font-bold" value={editingProduct.precio} onChange={e => setEditingProduct({...editingProduct, precio: parseFloat(e.target.value)})} />
                  <input placeholder="Stock" type="number" className="bg-offwhite p-4 rounded-2xl border border-primary/5 font-bold" value={editingProduct.stock} onChange={e => setEditingProduct({...editingProduct, stock: parseInt(e.target.value)})} />
                </div>
-               <select className="w-full bg-offwhite p-4 rounded-2xl border border-primary/5" value={editingProduct.departamento} onChange={e => setEditingProduct({...editingProduct, departamento: e.target.value as any})}>
+               <select className="w-full bg-offwhite p-4 rounded-2xl border border-primary/5 font-bold" value={editingProduct.departamento} onChange={e => setEditingProduct({...editingProduct, departamento: e.target.value as any})}>
                  {departments.map(d => <option key={d.id} value={d.slug}>{d.nombre}</option>)}
                </select>
                <button onClick={handleSaveProduct} disabled={saving} className="w-full bg-primary text-white py-5 rounded-2xl font-black shadow-xl">
-                 {saving ? <Loader2 className="animate-spin" /> : "Guardar Producto"}
+                 {saving ? <Loader2 className="animate-spin mx-auto" /> : "Guardar Producto"}
                </button>
              </div>
           </div>
@@ -350,9 +349,9 @@ const AdminPanel: React.FC<{
                <button onClick={() => setEditingDept(null)}><X /></button>
              </div>
              <div className="space-y-4">
-               <input placeholder="Nombre" className="w-full bg-offwhite p-4 rounded-2xl" value={editingDept.nombre} onChange={e => setEditingDept({...editingDept, nombre: e.target.value})} />
-               <input placeholder="Slug" className="w-full bg-offwhite p-4 rounded-2xl" value={editingDept.slug} onChange={e => setEditingDept({...editingDept, slug: e.target.value?.toLowerCase().replace(/\s+/g, '-') as any})} />
-               <input placeholder="WhatsApp" className="w-full bg-offwhite p-4 rounded-2xl" value={editingDept.telefono_whatsapp} onChange={e => setEditingDept({...editingDept, telefono_whatsapp: e.target.value})} />
+               <input placeholder="Nombre" className="w-full bg-offwhite p-4 rounded-2xl font-bold" value={editingDept.nombre} onChange={e => setEditingDept({...editingDept, nombre: e.target.value})} />
+               <input placeholder="Slug" className="w-full bg-offwhite p-4 rounded-2xl font-bold" value={editingDept.slug} onChange={e => setEditingDept({...editingDept, slug: e.target.value?.toLowerCase().replace(/\s+/g, '-') as any})} />
+               <input placeholder="WhatsApp" className="w-full bg-offwhite p-4 rounded-2xl font-bold" value={editingDept.telefono_whatsapp} onChange={e => setEditingDept({...editingDept, telefono_whatsapp: e.target.value})} />
                <input type="color" className="w-full h-12 rounded-lg cursor-pointer bg-transparent border-none" value={editingDept.color_hex} onChange={e => setEditingDept({...editingDept, color_hex: e.target.value})} />
                <button onClick={async () => { await db.upsertDepartment(editingDept); setEditingDept(null); onRefresh(); }} className="w-full bg-primary text-white py-4 rounded-2xl font-black shadow-lg">Guardar</button>
              </div>
@@ -368,12 +367,15 @@ const App: React.FC = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [config, setConfig] = useState<Config>(CONFIG_STUB);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [view, setView] = useState<'home' | 'cart' | 'checkout' | 'success' | 'admin' | 'login'>('home');
   const [isAuth, setIsAuth] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
 
   const refreshData = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const [pData, dData, cData] = await Promise.all([
         db.getProducts(),
@@ -383,15 +385,19 @@ const App: React.FC = () => {
       setProducts(pData || []);
       setDepartments(dData || []);
       if (cData) setConfig(cData);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    } catch (e) { 
+      console.error(e);
+      setError("No se pudo conectar con Supabase. Verifica tu configuración en Vercel.");
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   useEffect(() => { refreshData(); }, []);
 
   const addToCart = (p: Product) => {
     if (cart.length > 0 && cart[0].departamento !== p.departamento) {
-      alert("⚠️ Cambiaste de departamento. Termina tu pedido actual primero.");
+      alert("⚠️ Estás comprando en un departamento diferente. Finaliza tu pedido actual primero.");
       return;
     }
     setCart(prev => {
@@ -402,6 +408,8 @@ const App: React.FC = () => {
   };
 
   const finalizeOrder = async (orderData: Partial<Order>) => {
+    if (cart.length === 0) return;
+    
     const totalUSD = cart.reduce((acc, i) => acc + (i.precio * i.quantity), 0);
     const order: any = {
       order_id: `JX4-${Date.now()}`,
@@ -437,40 +445,78 @@ const App: React.FC = () => {
       const waUrl = `https://wa.me/${deptInfo?.telefono_whatsapp || config.whatsapp_general}?text=${encodeURIComponent(text)}`;
       window.open(waUrl, '_blank');
     } catch (e) {
-      alert("Error al procesar el pedido.");
+      console.error(e);
+      alert("Error al guardar el pedido en la base de datos.");
     }
   };
 
   const totalCart = cart.reduce((acc, i) => acc + i.quantity, 0);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-offwhite">
+        <Loader2 className="animate-spin text-primary" size={64} />
+        <div className="text-center">
+          <h2 className="text-2xl font-black text-primary">Sincronizando con Supabase</h2>
+          <p className="text-primary/40 font-bold">Iniciando JX4 Paracotos v11.0...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-red-50 p-6 text-center">
+        <WifiOff className="text-red-400" size={80} />
+        <h2 className="text-3xl font-black text-red-600">Error Crítico de Conexión</h2>
+        <p className="max-w-md text-red-500 font-medium">{error}</p>
+        <button onClick={refreshData} className="bg-red-600 text-white px-10 py-4 rounded-2xl font-black flex items-center gap-2 hover:bg-red-700">
+          <RefreshCcw size={24} /> Reintentar Conexión
+        </button>
+      </div>
+    );
+  }
+
   return (
     <HashRouter>
-      <div className="min-h-screen bg-offwhite selection:bg-accent selection:text-white">
+      <div className="min-h-screen bg-offwhite selection:bg-accent selection:text-white pb-32">
         <main className="max-w-7xl mx-auto">
-          {view === 'home' && <HomeView products={products} departments={departments} onAddToCart={addToCart} config={config} loading={loading} />}
-          {view === 'admin' && isAuth && <AdminPanel products={products} departments={departments} config={config} onRefresh={refreshData} onLogout={() => { setIsAuth(false); setView('home'); }} />}
+          {view === 'home' && <HomeView products={products} departments={departments} onAddToCart={addToCart} config={config} />}
+          
+          {view === 'admin' && isAuth && (
+            <AdminPanel products={products} departments={departments} config={config} onRefresh={refreshData} onLogout={() => { setIsAuth(false); setView('home'); }} />
+          )}
+
           {view === 'login' && (
-            <div className="min-h-screen flex items-center justify-center p-6">
+            <div className="min-h-screen flex items-center justify-center p-6 animate-fade-in">
                <form onSubmit={(e) => {
                  e.preventDefault();
                  const fd = new FormData(e.currentTarget);
                  if (fd.get('u')==='jjtovar1006' && fd.get('p')==='Apamate.25'){ setIsAuth(true); setView('admin'); }
-                 else { alert("Error."); }
-               }} className="glassmorphism p-12 rounded-[3rem] w-full max-w-md space-y-8 shadow-2xl border border-white animate-in slide-in-from-bottom-5">
+                 else { alert("Credenciales incorrectas."); }
+               }} className="glassmorphism p-12 rounded-[3rem] w-full max-w-md space-y-8 shadow-2xl border border-white">
                  <div className="text-center">
                     <div className="bg-primary w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-white mb-6"><LogIn size={32} /></div>
-                    <h2 className="text-3xl font-black">Acceso Admin</h2>
+                    <h2 className="text-3xl font-black">Admin Access</h2>
                  </div>
-                 <input name="u" required placeholder="Usuario" className="w-full bg-white p-5 rounded-2xl font-bold border border-primary/5" />
-                 <input name="p" type="password" required placeholder="Clave" className="w-full bg-white p-5 rounded-2xl font-bold border border-primary/5" />
-                 <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black shadow-xl hover:bg-accent transition-all">Acceder</button>
+                 <div className="space-y-4">
+                    <input name="u" required placeholder="Usuario" className="w-full bg-white p-5 rounded-2xl font-bold border border-primary/5 outline-none" />
+                    <input name="p" type="password" required placeholder="Clave de Seguridad" className="w-full bg-white p-5 rounded-2xl font-bold border border-primary/5 outline-none" />
+                 </div>
+                 <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all">Desbloquear Panel</button>
                </form>
             </div>
           )}
+
           {view === 'cart' && (
-             <div className="px-6 py-20 max-w-2xl mx-auto pb-32">
-                <h2 className="text-4xl font-black mb-10 text-primary">Resumen</h2>
-                {cart.length === 0 ? <p className="text-primary/20 font-black">Tu bolsa está vacía.</p> : (
+             <div className="px-6 py-20 max-w-2xl mx-auto animate-fade-in">
+                <h2 className="text-4xl font-black mb-10 text-primary">Tu Pedido</h2>
+                {cart.length === 0 ? (
+                  <div className="text-center py-20">
+                    <ShoppingBag className="mx-auto text-primary/5 mb-4" size={80} />
+                    <p className="text-primary/20 font-black">Tu bolsa está vacía.</p>
+                  </div>
+                ) : (
                   <div className="space-y-4">
                      {cart.map(i => (
                        <div key={i.id} className="glassmorphism p-4 rounded-[2rem] flex items-center gap-4 shadow-sm border border-white">
@@ -488,16 +534,19 @@ const App: React.FC = () => {
                        </div>
                      ))}
                      <div className="p-10 glassmorphism rounded-[2.5rem] mt-10 shadow-xl border border-white">
-                        <div className="flex justify-between items-center font-black text-4xl mb-6 text-primary"><span>Total:</span> <span>${cart.reduce((a,b) => a+(b.precio*b.quantity), 0).toFixed(2)}</span></div>
-                        <button onClick={() => setView('checkout')} className="w-full bg-primary text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-2xl">Confirmar Pedido <ArrowRight size={24} /></button>
+                        <div className="flex justify-between items-center font-black text-4xl mb-6 text-primary tracking-tighter">
+                          <span>Total:</span> <span>${cart.reduce((a,b) => a+(b.precio*b.quantity), 0).toFixed(2)}</span>
+                        </div>
+                        <button onClick={() => setView('checkout')} className="w-full bg-primary text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-2xl hover:bg-accent transition-all">Continuar a Datos <ArrowRight size={24} /></button>
                      </div>
                   </div>
                 )}
              </div>
           )}
+
           {view === 'checkout' && (
-            <div className="px-6 py-20 max-w-xl mx-auto pb-32">
-              <h2 className="text-3xl font-black mb-8">Finalizar Pedido</h2>
+            <div className="px-6 py-20 max-w-xl mx-auto animate-fade-in">
+              <h2 className="text-3xl font-black mb-8">Información de Entrega</h2>
               <form onSubmit={(e) => {
                 e.preventDefault();
                 const fd = new FormData(e.currentTarget);
@@ -509,39 +558,50 @@ const App: React.FC = () => {
                 });
               }} className="space-y-6">
                 <div className="glassmorphism p-6 rounded-[2rem] space-y-4 border border-white shadow-sm">
-                  <input name="n" required placeholder="Nombre Completo" className="w-full bg-offwhite p-4 rounded-xl outline-none font-bold" />
-                  <input name="t" required type="tel" placeholder="WhatsApp" className="w-full bg-offwhite p-4 rounded-xl outline-none font-bold" />
-                  <textarea name="d" required placeholder="Dirección" className="w-full bg-offwhite p-4 rounded-xl outline-none font-bold h-24 resize-none" />
+                  <input name="n" required placeholder="Nombre y Apellido" className="w-full bg-offwhite p-4 rounded-xl outline-none font-bold" />
+                  <input name="t" required type="tel" placeholder="Número WhatsApp (Ej: 58424...)" className="w-full bg-offwhite p-4 rounded-xl outline-none font-bold" />
+                  <textarea name="d" required placeholder="Dirección de entrega detallada" className="w-full bg-offwhite p-4 rounded-xl outline-none font-bold h-24 resize-none" />
                 </div>
                 <div className="glassmorphism p-6 rounded-[2rem] border border-white shadow-sm">
-                  <h3 className="text-xs font-black uppercase text-primary/30 mb-4">Metodo de Entrega</h3>
+                  <h3 className="text-xs font-black uppercase text-primary/30 mb-4 tracking-widest">Modalidad</h3>
                   <div className="grid grid-cols-2 gap-4">
-                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer"><input type="radio" name="e" value="retiro" defaultChecked /> <span className="font-bold">Retiro</span></label>
-                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer"><input type="radio" name="e" value="delivery" /> <span className="font-bold">Delivery</span></label>
+                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer">
+                      <input type="radio" name="e" value="retiro" defaultChecked className="accent-primary" /> 
+                      <span className="font-bold flex items-center gap-2"><Store size={16}/> Retiro</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer">
+                      <input type="radio" name="e" value="delivery" className="accent-primary" /> 
+                      <span className="font-bold flex items-center gap-2"><Bike size={16}/> Delivery</span>
+                    </label>
                   </div>
                 </div>
-                <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl">Completar Pedido</button>
+                <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all">Finalizar por WhatsApp</button>
               </form>
             </div>
           )}
+
           {view === 'success' && currentOrder && (
-            <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-in zoom-in-95">
+            <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-fade-in">
                <div className="w-32 h-32 bg-green-50 rounded-full flex items-center justify-center mb-10 shadow-inner border border-green-100"><CheckCircle2 size={80} className="text-green-500" /></div>
-               <h2 className="text-5xl font-black mb-6 tracking-tighter text-primary">¡Pedido Exitoso!</h2>
-               <p className="text-primary/50 mb-12 max-w-sm text-lg font-medium">Tu pedido <strong>{currentOrder.order_id}</strong> ha sido guardado. Haz clic abajo para abrir WhatsApp si no se abrió solo.</p>
-               <button onClick={() => window.open(`https://wa.me/${config.whatsapp_general}`, '_blank')} className="bg-green-500 text-white px-10 py-4 rounded-2xl font-black flex items-center gap-2 mb-4 hover:bg-green-600 transition-all"><ExternalLink size={20} /> Abrir WhatsApp</button>
-               <button onClick={() => setView('home')} className="bg-primary text-white px-16 py-5 rounded-2xl font-black text-xl shadow-2xl hover:scale-105 transition-all">Volver a Inicio</button>
+               <h2 className="text-5xl font-black mb-6 tracking-tighter text-primary">¡Pedido Recibido!</h2>
+               <p className="text-primary/50 mb-12 max-w-sm text-lg font-medium">Tu orden <strong>{currentOrder.order_id}</strong> se ha procesado exitosamente en nuestra nube.</p>
+               <div className="flex flex-col gap-4 w-full max-w-xs">
+                 <button onClick={() => window.open(`https://wa.me/${config.whatsapp_general}`, '_blank')} className="bg-green-500 text-white px-10 py-5 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-green-600 transition-all shadow-xl shadow-green-200">
+                    <ExternalLink size={24} /> Abrir WhatsApp
+                 </button>
+                 <button onClick={() => setView('home')} className="bg-primary text-white px-10 py-5 rounded-2xl font-black text-xl shadow-2xl hover:scale-105 transition-all">Volver al Inicio</button>
+               </div>
             </div>
           )}
         </main>
 
-        <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 w-[85%] max-w-md glassmorphism rounded-full px-10 py-6 flex items-center justify-between shadow-2xl z-50 border border-white/40">
-          <button onClick={() => setView('home')} className={`p-2 transition-all ${view === 'home' ? 'text-accent scale-150' : 'text-primary/30'}`}><TrendingUp size={24} /></button>
-          <button onClick={() => setView('cart')} className={`p-2 relative transition-all ${view === 'cart' ? 'text-accent scale-150' : 'text-primary/30'}`}>
-            <ShoppingBag size={24} />
-            {totalCart > 0 && <span className="absolute -top-2 -right-2 bg-accent text-white text-[9px] font-black w-6 h-6 flex items-center justify-center rounded-full border-[3px] border-white shadow-lg">{totalCart}</span>}
+        <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md glassmorphism rounded-full px-10 py-5 flex items-center justify-between shadow-2xl z-50 border border-white/40">
+          <button onClick={() => setView('home')} className={`p-2 transition-all duration-300 ${view === 'home' ? 'text-accent scale-125' : 'text-primary/30'}`}><TrendingUp size={28} /></button>
+          <button onClick={() => setView('cart')} className={`p-2 relative transition-all duration-300 ${view === 'cart' ? 'text-accent scale-125' : 'text-primary/30'}`}>
+            <ShoppingBag size={28} />
+            {totalCart > 0 && <span className="absolute -top-1 -right-1 bg-accent text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-lg">{totalCart}</span>}
           </button>
-          <button onClick={() => isAuth ? setView('admin') : setView('login')} className={`p-2 transition-all ${view === 'admin' || view === 'login' ? 'text-accent scale-150' : 'text-primary/30'}`}><LayoutDashboard size={24} /></button>
+          <button onClick={() => isAuth ? setView('admin') : setView('login')} className={`p-2 transition-all duration-300 ${view === 'admin' || view === 'login' ? 'text-accent scale-125' : 'text-primary/30'}`}><LayoutDashboard size={28} /></button>
         </nav>
       </div>
     </HashRouter>

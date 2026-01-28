@@ -1,8 +1,17 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lgdixakavpqlxgltzuei.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ';
+// Acceso seguro a variables de entorno con fallbacks
+const getEnv = (key: string, fallback: string) => {
+  try {
+    return (process.env && process.env[key]) || fallback;
+  } catch (e) {
+    return fallback;
+  }
+};
+
+const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://lgdixakavpqlxgltzuei.supabase.co');
+const supabaseAnonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ');
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -34,7 +43,7 @@ export const db = {
   getProducts: async () => {
     const { data, error } = await supabase.from('products').select('*').order('nombre');
     if (error) throw error;
-    return data;
+    return data || [];
   },
   upsertProduct: async (product: any) => {
     const { data, error } = await supabase.from('products').upsert(product).select();
@@ -48,7 +57,7 @@ export const db = {
   getDepartments: async () => {
     const { data, error } = await supabase.from('departments').select('*').order('nombre');
     if (error) throw error;
-    return data;
+    return data || [];
   },
   upsertDepartment: async (dept: any) => {
     const { data, error } = await supabase.from('departments').upsert(dept).select();
@@ -60,9 +69,13 @@ export const db = {
     if (error) throw error;
   },
   getConfig: async () => {
-    const { data, error } = await supabase.from('site_config').select('*').single();
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
+    try {
+      const { data, error } = await supabase.from('site_config').select('*').single();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    } catch (e) {
+      return null;
+    }
   },
   updateConfig: async (config: any) => {
     const { data, error } = await supabase.from('site_config').upsert({ id: 1, ...config }).select();
@@ -77,6 +90,6 @@ export const db = {
   getOrders: async () => {
     const { data, error } = await supabase.from('orders').select('*').order('fecha_pedido', { ascending: false });
     if (error) throw error;
-    return data;
+    return data || [];
   }
 };

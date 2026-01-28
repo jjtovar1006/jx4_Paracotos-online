@@ -5,6 +5,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JX4 Paracotos v11.0</title>
+  <script>
+    // Shim para evitar errores de process is not defined en el navegador
+    window.process = window.process || { env: {} };
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,15 +18,14 @@
       font-family: 'Plus Jakarta Sans', sans-serif;
       background-color: #f8f9f8;
       color: #3d4a3e;
+      margin: 0;
+      padding: 0;
     }
     .glassmorphism {
       background: rgba(255, 255, 255, 0.8);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-    .text-balance {
-      text-wrap: balance;
     }
     .hide-scrollbar::-webkit-scrollbar {
       display: none;
@@ -31,8 +34,13 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
-    input[type="file"]::file-selector-button {
-      display: none;
+    /* Animación de entrada suave */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.5s ease-out forwards;
     }
   </style>
   <script>
