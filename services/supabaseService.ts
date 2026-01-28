@@ -1,28 +1,25 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// These environment variables should be set in Vercel
-const supabaseUrl = (process.env as any).SUPABASE_URL || '';
-const supabaseAnonKey = (process.env as any).SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lgdixakavpqlxgltzuei.supabase.co';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function uploadImage(file: File, bucket: string = 'public-assets'): Promise<string> {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn("Supabase credentials missing. Returning local object URL for preview.");
-    return URL.createObjectURL(file);
-  }
-
   const fileExt = file.name.split('.').pop();
-  const fileName = `${Math.random()}.${fileExt}`;
-  const filePath = `${fileName}`;
+  const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+  const filePath = `uploads/${fileName}`;
 
   const { data, error } = await supabase.storage
     .from(bucket)
-    .upload(filePath, file);
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false
+    });
 
   if (error) {
-    console.error('Error uploading image:', error);
+    console.error('Error uploading image to Supabase:', error);
     throw error;
   }
 
@@ -32,3 +29,54 @@ export async function uploadImage(file: File, bucket: string = 'public-assets'):
 
   return publicUrl;
 }
+
+export const db = {
+  getProducts: async () => {
+    const { data, error } = await supabase.from('products').select('*').order('nombre');
+    if (error) throw error;
+    return data;
+  },
+  upsertProduct: async (product: any) => {
+    const { data, error } = await supabase.from('products').upsert(product).select();
+    if (error) throw error;
+    return data;
+  },
+  deleteProduct: async (id: string) => {
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) throw error;
+  },
+  getDepartments: async () => {
+    const { data, error } = await supabase.from('departments').select('*').order('nombre');
+    if (error) throw error;
+    return data;
+  },
+  upsertDepartment: async (dept: any) => {
+    const { data, error } = await supabase.from('departments').upsert(dept).select();
+    if (error) throw error;
+    return data;
+  },
+  deleteDepartment: async (id: string) => {
+    const { error } = await supabase.from('departments').delete().eq('id', id);
+    if (error) throw error;
+  },
+  getConfig: async () => {
+    const { data, error } = await supabase.from('site_config').select('*').single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
+  },
+  updateConfig: async (config: any) => {
+    const { data, error } = await supabase.from('site_config').upsert({ id: 1, ...config }).select();
+    if (error) throw error;
+    return data;
+  },
+  saveOrder: async (order: any) => {
+    const { data, error } = await supabase.from('orders').insert(order).select();
+    if (error) throw error;
+    return data;
+  },
+  getOrders: async () => {
+    const { data, error } = await supabase.from('orders').select('*').order('fecha_pedido', { ascending: false });
+    if (error) throw error;
+    return data;
+  }
+};
