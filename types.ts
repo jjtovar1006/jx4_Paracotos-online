@@ -1,0 +1,55 @@
+
+export type DepartmentSlug = 'carnes' | 'aves' | 'embutidos' | 'pescados';
+
+export interface Product {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  precio: number;
+  stock: number;
+  imagen_url: string;
+  categoria: string;
+  departamento: DepartmentSlug;
+  unidad: 'und' | 'kg';
+  peso_referencial: boolean;
+  disponible: boolean;
+  destacado: boolean;
+}
+
+export interface CartItem extends Product {
+  quantity: number;
+}
+
+export interface Department {
+  id: string;
+  nombre: string;
+  slug: DepartmentSlug;
+  telefono_whatsapp: string;
+  activo: boolean;
+  color_hex: string;
+}
+
+export interface Order {
+  id: string;
+  order_id: string;
+  telefono_cliente: string;
+  nombre_cliente: string;
+  productos: CartItem[];
+  total: number;
+  total_bs: number;
+  metodo_pago: string;
+  metodo_entrega: 'delivery' | 'retiro';
+  tipo_transporte?: 'moto' | 'carro' | 'camion';
+  estado: 'pendiente' | 'confirmado' | 'entregado' | 'cancelado';
+  departamento: DepartmentSlug;
+  fecha_pedido: string;
+  direccion: string;
+}
+
+export interface Config {
+  tasa_cambio: number;
+  cintillo_promocional: string;
+  slogan: string;
+  logo_url: string;
+  whatsapp_general: string;
+}

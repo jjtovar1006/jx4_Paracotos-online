@@ -1,0 +1,7 @@
+{
+  "name": "JX4 Paracotos v11.0",
+  "description": "Plataforma de comercio electrónico multi-departamento de alto rendimiento con integración de Supabase y WhatsApp.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
