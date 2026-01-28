@@ -4,7 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 // Acceso seguro a variables de entorno con fallbacks
 const getEnv = (key: string, fallback: string) => {
   try {
-    return (process.env && process.env[key]) || fallback;
+    // En Vercel/Browser, buscamos en window.process.env inyectado por el shim
+    return (window as any).process?.env?.[key] || fallback;
   } catch (e) {
     return fallback;
   }
@@ -74,6 +75,7 @@ export const db = {
       if (error && error.code !== 'PGRST116') throw error;
       return data;
     } catch (e) {
+      console.warn("Config no encontrada, usando valores por defecto.");
       return null;
     }
   },

@@ -315,7 +315,6 @@ const AdminPanel: React.FC<{
         </div>
       )}
       
-      {/* Modales Crud */}
       {editingProduct && (
         <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
@@ -387,7 +386,7 @@ const App: React.FC = () => {
       if (cData) setConfig(cData);
     } catch (e) { 
       console.error(e);
-      setError("No se pudo conectar con Supabase. Verifica tu configuración en Vercel.");
+      setError("No se pudo conectar con Supabase. Revisa las variables de entorno.");
     } finally { 
       setLoading(false); 
     }
@@ -446,7 +445,7 @@ const App: React.FC = () => {
       window.open(waUrl, '_blank');
     } catch (e) {
       console.error(e);
-      alert("Error al guardar el pedido en la base de datos.");
+      alert("Error al guardar el pedido.");
     }
   };
 
@@ -457,8 +456,8 @@ const App: React.FC = () => {
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-offwhite">
         <Loader2 className="animate-spin text-primary" size={64} />
         <div className="text-center">
-          <h2 className="text-2xl font-black text-primary">Sincronizando con Supabase</h2>
-          <p className="text-primary/40 font-bold">Iniciando JX4 Paracotos v11.0...</p>
+          <h2 className="text-2xl font-black text-primary">Cargando JX4</h2>
+          <p className="text-primary/40 font-bold">Iniciando aplicación...</p>
         </div>
       </div>
     );
@@ -468,10 +467,10 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-red-50 p-6 text-center">
         <WifiOff className="text-red-400" size={80} />
-        <h2 className="text-3xl font-black text-red-600">Error Crítico de Conexión</h2>
+        <h2 className="text-3xl font-black text-red-600">Error de Conexión</h2>
         <p className="max-w-md text-red-500 font-medium">{error}</p>
-        <button onClick={refreshData} className="bg-red-600 text-white px-10 py-4 rounded-2xl font-black flex items-center gap-2 hover:bg-red-700">
-          <RefreshCcw size={24} /> Reintentar Conexión
+        <button onClick={refreshData} className="bg-red-600 text-white px-10 py-4 rounded-2xl font-black flex items-center gap-2">
+          <RefreshCcw size={24} /> Reintentar
         </button>
       </div>
     );
@@ -482,11 +481,7 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-offwhite selection:bg-accent selection:text-white pb-32">
         <main className="max-w-7xl mx-auto">
           {view === 'home' && <HomeView products={products} departments={departments} onAddToCart={addToCart} config={config} />}
-          
-          {view === 'admin' && isAuth && (
-            <AdminPanel products={products} departments={departments} config={config} onRefresh={refreshData} onLogout={() => { setIsAuth(false); setView('home'); }} />
-          )}
-
+          {view === 'admin' && isAuth && <AdminPanel products={products} departments={departments} config={config} onRefresh={refreshData} onLogout={() => { setIsAuth(false); setView('home'); }} />}
           {view === 'login' && (
             <div className="min-h-screen flex items-center justify-center p-6 animate-fade-in">
                <form onSubmit={(e) => {
@@ -501,21 +496,17 @@ const App: React.FC = () => {
                  </div>
                  <div className="space-y-4">
                     <input name="u" required placeholder="Usuario" className="w-full bg-white p-5 rounded-2xl font-bold border border-primary/5 outline-none" />
-                    <input name="p" type="password" required placeholder="Clave de Seguridad" className="w-full bg-white p-5 rounded-2xl font-bold border border-primary/5 outline-none" />
+                    <input name="p" type="password" required placeholder="Clave" className="w-full bg-white p-5 rounded-2xl font-bold border border-primary/5 outline-none" />
                  </div>
-                 <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all">Desbloquear Panel</button>
+                 <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all">Acceder</button>
                </form>
             </div>
           )}
-
           {view === 'cart' && (
              <div className="px-6 py-20 max-w-2xl mx-auto animate-fade-in">
-                <h2 className="text-4xl font-black mb-10 text-primary">Tu Pedido</h2>
+                <h2 className="text-4xl font-black mb-10 text-primary">Tu Carrito</h2>
                 {cart.length === 0 ? (
-                  <div className="text-center py-20">
-                    <ShoppingBag className="mx-auto text-primary/5 mb-4" size={80} />
-                    <p className="text-primary/20 font-black">Tu bolsa está vacía.</p>
-                  </div>
+                  <div className="text-center py-20"><ShoppingBag className="mx-auto text-primary/5 mb-4" size={80} /><p className="text-primary/20 font-black">Tu bolsa está vacía.</p></div>
                 ) : (
                   <div className="space-y-4">
                      {cart.map(i => (
@@ -534,19 +525,16 @@ const App: React.FC = () => {
                        </div>
                      ))}
                      <div className="p-10 glassmorphism rounded-[2.5rem] mt-10 shadow-xl border border-white">
-                        <div className="flex justify-between items-center font-black text-4xl mb-6 text-primary tracking-tighter">
-                          <span>Total:</span> <span>${cart.reduce((a,b) => a+(b.precio*b.quantity), 0).toFixed(2)}</span>
-                        </div>
-                        <button onClick={() => setView('checkout')} className="w-full bg-primary text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-2xl hover:bg-accent transition-all">Continuar a Datos <ArrowRight size={24} /></button>
+                        <div className="flex justify-between items-center font-black text-4xl mb-6 text-primary tracking-tighter"><span>Total:</span> <span>${cart.reduce((a,b) => a+(b.precio*b.quantity), 0).toFixed(2)}</span></div>
+                        <button onClick={() => setView('checkout')} className="w-full bg-primary text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-2xl hover:bg-accent transition-all">Continuar <ArrowRight size={24} /></button>
                      </div>
                   </div>
                 )}
              </div>
           )}
-
           {view === 'checkout' && (
             <div className="px-6 py-20 max-w-xl mx-auto animate-fade-in">
-              <h2 className="text-3xl font-black mb-8">Información de Entrega</h2>
+              <h2 className="text-3xl font-black mb-8">Datos de Envío</h2>
               <form onSubmit={(e) => {
                 e.preventDefault();
                 const fd = new FormData(e.currentTarget);
@@ -558,43 +546,30 @@ const App: React.FC = () => {
                 });
               }} className="space-y-6">
                 <div className="glassmorphism p-6 rounded-[2rem] space-y-4 border border-white shadow-sm">
-                  <input name="n" required placeholder="Nombre y Apellido" className="w-full bg-offwhite p-4 rounded-xl outline-none font-bold" />
-                  <input name="t" required type="tel" placeholder="Número WhatsApp (Ej: 58424...)" className="w-full bg-offwhite p-4 rounded-xl outline-none font-bold" />
-                  <textarea name="d" required placeholder="Dirección de entrega detallada" className="w-full bg-offwhite p-4 rounded-xl outline-none font-bold h-24 resize-none" />
+                  <input name="n" required placeholder="Nombre Completo" className="w-full bg-offwhite p-4 rounded-xl outline-none font-bold" />
+                  <input name="t" required type="tel" placeholder="WhatsApp (58424...)" className="w-full bg-offwhite p-4 rounded-xl outline-none font-bold" />
+                  <textarea name="d" required placeholder="Dirección exacta" className="w-full bg-offwhite p-4 rounded-xl outline-none font-bold h-24 resize-none" />
                 </div>
                 <div className="glassmorphism p-6 rounded-[2rem] border border-white shadow-sm">
-                  <h3 className="text-xs font-black uppercase text-primary/30 mb-4 tracking-widest">Modalidad</h3>
+                  <h3 className="text-xs font-black uppercase text-primary/30 mb-4 tracking-widest">Entrega</h3>
                   <div className="grid grid-cols-2 gap-4">
-                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer">
-                      <input type="radio" name="e" value="retiro" defaultChecked className="accent-primary" /> 
-                      <span className="font-bold flex items-center gap-2"><Store size={16}/> Retiro</span>
-                    </label>
-                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer">
-                      <input type="radio" name="e" value="delivery" className="accent-primary" /> 
-                      <span className="font-bold flex items-center gap-2"><Bike size={16}/> Delivery</span>
-                    </label>
+                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer"><input type="radio" name="e" value="retiro" defaultChecked /><span className="font-bold">Retiro</span></label>
+                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer"><input type="radio" name="e" value="delivery" /><span className="font-bold">Delivery</span></label>
                   </div>
                 </div>
-                <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all">Finalizar por WhatsApp</button>
+                <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl">Finalizar Pedido</button>
               </form>
             </div>
           )}
-
           {view === 'success' && currentOrder && (
             <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-fade-in">
                <div className="w-32 h-32 bg-green-50 rounded-full flex items-center justify-center mb-10 shadow-inner border border-green-100"><CheckCircle2 size={80} className="text-green-500" /></div>
-               <h2 className="text-5xl font-black mb-6 tracking-tighter text-primary">¡Pedido Recibido!</h2>
-               <p className="text-primary/50 mb-12 max-w-sm text-lg font-medium">Tu orden <strong>{currentOrder.order_id}</strong> se ha procesado exitosamente en nuestra nube.</p>
-               <div className="flex flex-col gap-4 w-full max-w-xs">
-                 <button onClick={() => window.open(`https://wa.me/${config.whatsapp_general}`, '_blank')} className="bg-green-500 text-white px-10 py-5 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-green-600 transition-all shadow-xl shadow-green-200">
-                    <ExternalLink size={24} /> Abrir WhatsApp
-                 </button>
-                 <button onClick={() => setView('home')} className="bg-primary text-white px-10 py-5 rounded-2xl font-black text-xl shadow-2xl hover:scale-105 transition-all">Volver al Inicio</button>
-               </div>
+               <h2 className="text-5xl font-black mb-6 tracking-tighter text-primary">¡Listo!</h2>
+               <p className="text-primary/50 mb-12 max-w-sm text-lg font-medium">Tu orden <strong>{currentOrder.order_id}</strong> se ha procesado exitosamente.</p>
+               <button onClick={() => setView('home')} className="bg-primary text-white px-16 py-5 rounded-2xl font-black text-xl shadow-2xl hover:scale-105 transition-all">Volver al Inicio</button>
             </div>
           )}
         </main>
-
         <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md glassmorphism rounded-full px-10 py-5 flex items-center justify-between shadow-2xl z-50 border border-white/40">
           <button onClick={() => setView('home')} className={`p-2 transition-all duration-300 ${view === 'home' ? 'text-accent scale-125' : 'text-primary/30'}`}><TrendingUp size={28} /></button>
           <button onClick={() => setView('cart')} className={`p-2 relative transition-all duration-300 ${view === 'cart' ? 'text-accent scale-125' : 'text-primary/30'}`}>
