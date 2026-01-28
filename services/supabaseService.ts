@@ -1,21 +1,13 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Helper robusto para obtener variables de entorno en el navegador
 const getEnv = (key: string, fallback: string): string => {
   try {
-    // Intenta obtener de process.env (inyectado por build tool o shim)
-    if (typeof process !== 'undefined' && process.env && process.env[key]) {
-      return process.env[key] as string;
-    }
-    // Intenta obtener de window.process.env (shim manual)
-    if ((window as any).process?.env?.[key]) {
-      return (window as any).process.env[key];
-    }
+    const win = window as any;
+    return win.process?.env?.[key] || fallback;
   } catch (e) {
-    console.warn(`Error accediendo a la variable ${key}:`, e);
+    return fallback;
   }
-  return fallback;
 };
 
 const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://lgdixakavpqlxgltzuei.supabase.co');
@@ -50,14 +42,15 @@ export async function uploadImage(file: File, bucket: string = 'public-assets'):
 export const db = {
   getProducts: async () => {
     const { data, error } = await supabase.from('products').select('*').order('nombre');
-    if (error) throw error;
+    if (error) {
+      console.warn("Error en tabla 'products':", error.message);
+      throw error;
+    }
     return data || [];
   },
   upsertProduct: async (product: any) => {
-    // Asegurarse de no enviar el id si es nuevo
     const payload = { ...product };
     if (!payload.id) delete payload.id;
-    
     const { data, error } = await supabase.from('products').upsert(payload).select();
     if (error) throw error;
     return data;
@@ -68,13 +61,15 @@ export const db = {
   },
   getDepartments: async () => {
     const { data, error } = await supabase.from('departments').select('*').order('nombre');
-    if (error) throw error;
+    if (error) {
+      console.warn("Error en tabla 'departments':", error.message);
+      throw error;
+    }
     return data || [];
   },
   upsertDepartment: async (dept: any) => {
     const payload = { ...dept };
     if (!payload.id) delete payload.id;
-
     const { data, error } = await supabase.from('departments').upsert(payload).select();
     if (error) throw error;
     return data;
@@ -86,10 +81,12 @@ export const db = {
   getConfig: async () => {
     try {
       const { data, error } = await supabase.from('site_config').select('*').single();
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) {
+        if (error.code === 'PGRST205') console.error("La tabla 'site_config' NO existe en tu Supabase.");
+        if (error.code !== 'PGRST116') throw error;
+      }
       return data;
     } catch (e) {
-      console.warn("Config no encontrada en Supabase, usando valores por defecto.");
       return null;
     }
   },
@@ -100,7 +97,10 @@ export const db = {
   },
   saveOrder: async (order: any) => {
     const { data, error } = await supabase.from('orders').insert(order).select();
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST205') alert("Error Crítico: La tabla 'orders' no existe en Supabase. Ejecuta el SQL de creación.");
+      throw error;
+    }
     return data;
   },
   getOrders: async () => {

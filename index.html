@@ -4,12 +4,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
   <title>JX4 Paracotos v11.0</title>
   <script>
-    // Shim completo para asegurar que React y otras librerías encuentren el objeto process
+    // Shim global para evitar errores de 'process is not defined' en módulos
     window.process = {
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        API_KEY: '' // Se inyectará externamente si es necesario
       }
     };
   </script>
@@ -38,7 +40,6 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
-    /* Animación de entrada suave */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
@@ -90,5 +91,6 @@
 </head>
 <body>
   <div id="root"></div>
+  <script type="module" src="./index.tsx"></script>
 </body>
 </html>
