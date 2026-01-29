@@ -4,9 +4,9 @@ import { createClient } from '@supabase/supabase-js';
 const getEnv = (key: string, fallback: string): string => {
   try {
     const val = (window as any).process?.env?.[key] || (typeof process !== 'undefined' ? process.env[key] : null);
-    return val || fallback;
+    return (val || fallback).trim(); // Trim para evitar espacios invisibles
   } catch (e) {
-    return fallback;
+    return fallback.trim();
   }
 };
 
@@ -15,14 +15,21 @@ const supabaseAnonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI
 
 let supabase: any = null;
 try {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
+  // Configuración explícita del cliente
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
 } catch (e) {
   console.error("Critical: Failed to init Supabase client", e);
 }
 
 const isUuidString = (v: any) => {
   if (typeof v !== 'string') return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 };
 
 const cleanPayload = (payload: any): any => {
@@ -45,7 +52,7 @@ const cleanPayload = (payload: any): any => {
 };
 
 export async function uploadImage(file: File, bucket: string = 'public-assets'): Promise<string> {
-  if (!supabase) throw new Error("Database not connected");
+  if (!supabase) throw new Error("Base de datos no conectada");
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
   const filePath = `uploads/${fileName}`;
@@ -59,47 +66,61 @@ export const db = {
   login: async (username: string, password: string) => {
     if (!supabase) throw new Error("Error de conexión con el servidor.");
 
-    // 1. Invocamos la Edge Function de Supabase
-    const { data: authResult, error: invokeError } = await supabase.functions.invoke('login-by-username', {
-      body: { username, password }
-    });
-
-    if (invokeError) {
-      console.error("Function invoke error:", invokeError);
-      throw new Error(`Error de servidor: ${invokeError.message || 'No se pudo contactar con el servicio de autenticación'}`);
-    }
-
-    if (authResult?.error) {
-      throw new Error(authResult.error === 'Invalid credentials' ? "Usuario o clave incorrectos." : authResult.error);
-    }
-
-    // 2. Establecemos la sesión localmente para que las consultas siguientes tengan los headers correctos
-    if (authResult?.access_token) {
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: authResult.access_token,
-        refresh_token: authResult.refresh_token
+    try {
+      // Invocamos la función usando el método estándar del SDK
+      // body debe ser un objeto JSON plano
+      const { data, error: invokeError } = await supabase.functions.invoke('login-by-username', {
+        body: { username, password }
       });
-      if (sessionError) console.error("Session set error:", sessionError);
+
+      if (invokeError) {
+        // El SDK a veces lanza "Failed to fetch" dentro de invokeError
+        console.error("Invoke error details:", invokeError);
+        if (invokeError.message?.includes('Failed to fetch')) {
+          throw new Error("No se pudo conectar con la Edge Function. Verifica que esté desplegada y acepte CORS.");
+        }
+        throw new Error(invokeError.message || "Error al invocar la función de autenticación.");
+      }
+
+      if (data?.error) {
+        throw new Error(data.error === 'Invalid credentials' ? "Usuario o clave incorrectos." : data.error);
+      }
+
+      // Establecemos la sesión para que el cliente Supabase esté autenticado
+      if (data?.access_token) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token
+        });
+        if (sessionError) console.error("Session set error:", sessionError);
+      }
+
+      // Recuperamos el perfil extendido de la tabla admin_users
+      const { data: profile, error: profileError } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('username', username)
+        .maybeSingle();
+
+      if (profileError) {
+        throw new Error(`Sesión válida, pero error al cargar perfil: ${profileError.message}`);
+      }
+
+      if (!profile) {
+        await supabase.auth.signOut();
+        throw new Error("Este usuario no tiene permisos de administrador.");
+      }
+
+      return profile;
+
+    } catch (e: any) {
+      console.error("Login attempt failed:", e);
+      // Captura de errores de red puros
+      if (e.message?.includes('Failed to fetch') || e.name === 'TypeError') {
+        throw new Error("Error de red: No se pudo contactar con Supabase. Revisa tu conexión o el estado de las Edge Functions.");
+      }
+      throw e;
     }
-
-    // 3. Recuperamos el perfil extendido de la tabla admin_users
-    const { data: profile, error: profileError } = await supabase
-      .from('admin_users')
-      .select('*')
-      .eq('username', username)
-      .maybeSingle();
-
-    if (profileError) {
-      throw new Error(`Sesión iniciada, pero hubo un error al cargar el perfil: ${profileError.message}`);
-    }
-
-    if (!profile) {
-      // El usuario está en auth.users pero no tiene registro en admin_users
-      await supabase.auth.signOut();
-      throw new Error("Este usuario no tiene permisos de administrador en el sistema.");
-    }
-
-    return profile;
   },
   getAdmins: async () => {
     if (!supabase) return [];

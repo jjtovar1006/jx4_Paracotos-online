@@ -8,14 +8,16 @@
   <title>JX4 Paracotos v11.0</title>
   <script>
     // Shim ultra-temprano para evitar ReferenceError en Vercel
-    window.process = {
-      env: {
+    // Se utiliza un objeto sellado para evitar sobreescrituras accidentales
+    (function() {
+      const env = {
         NODE_ENV: 'production',
         API_KEY: '',
         NEXT_PUBLIC_SUPABASE_URL: 'https://lgdixakavpqlxgltzuei.supabase.co',
         NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ'
-      }
-    };
+      };
+      window.process = { env: env };
+    })();
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
