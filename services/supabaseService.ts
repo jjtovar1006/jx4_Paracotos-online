@@ -45,21 +45,26 @@ const cleanPayload = (payload: any): any => {
     // Recurse primero para objetos/arrays
     if (val && typeof val === 'object') {
       const cleaned = cleanPayload(val);
+      // Si el objeto/array resultante es un objeto vacío o array vacío, mantenerlo (puedes ajustar)
       out[key] = cleaned;
       continue;
     }
 
     // Manejo para strings vacíos
     if (typeof val === 'string' && val.trim() === '') {
+      // Si la key es 'id' o termina en '_id' -> eliminar para permitir que la DB genere el UUID
       if (key === 'id' || key.endsWith('_id')) {
+        // omitimos la propiedad (no la añadimos a out)
         continue;
       }
+      // Para otros campos, convertir "" -> null (más seguro que enviar "")
       out[key] = null;
       continue;
     }
 
     // Manejo: si la key parece un uuid y el valor no es uuid válido, eliminarla
     if ((key === 'id' || key.endsWith('_id') || key.endsWith('Id')) && val != null) {
+      // si es string no válido como uuid, eliminar para evitar error de cast
       if (typeof val === 'string' && !isUuidString(val)) {
         continue;
       }
@@ -75,35 +80,40 @@ export async function uploadImage(file: File, bucket: string = 'public-assets'):
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
   const filePath = `uploads/${fileName}`;
-
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .upload(filePath, file, {
-      cacheControl: '3600',
-      upsert: false
-    });
-
-  if (error) {
-    console.error('Error uploading image to Supabase:', error);
-    throw error;
-  }
-
-  const { data: { publicUrl } } = supabase.storage
-    .from(bucket)
-    .getPublicUrl(filePath);
-
+  const { data, error } = await supabase.storage.from(bucket).upload(filePath, file, { cacheControl: '3600', upsert: false });
+  if (error) throw error;
+  const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(filePath);
   return publicUrl;
 }
 
 export const db = {
   login: async (username: string, password: string) => {
+    // Verificar si hay usuarios en la tabla para guiar al desarrollador
+    const { count, error: countError } = await supabase
+      .from('admin_users')
+      .select('*', { count: 'exact', head: true });
+
+    if (countError) {
+      if (countError.message.includes('column "dept_slugs" does not exist')) {
+        throw new Error("Falta la columna 'dept_slugs'. Ejecuta el SQL de migración en el SQL Editor de Supabase.");
+      }
+      throw new Error(`Error de conexión con la base de datos: ${countError.message}`);
+    }
+
+    if (count === 0) {
+      throw new Error("No hay administradores registrados. Debes crear el primero en el SQL Editor de Supabase ejecutando el script de INSERT.");
+    }
+
     const { data, error } = await supabase
       .from('admin_users')
       .select('*')
       .eq('username', username)
       .eq('password', password)
-      .single();
-    if (error) throw new Error("Credenciales inválidas o usuario no encontrado");
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) throw new Error("Usuario o clave incorrectos.");
+    
     return data;
   },
   
@@ -171,25 +181,18 @@ export const db = {
   saveOrder: async (order: any) => {
     const payload = cleanPayload(order);
     const { data, error } = await supabase.from('orders').insert(payload).select();
-    if (error) {
-      console.error("Supabase Insert Error:", error);
-      throw new Error(error.message);
-    }
+    if (error) throw new Error(error.message);
     return data;
   },
   getOrders: async (deptSlugs?: string | string[]) => {
     let query = supabase.from('orders').select('*').order('fecha_pedido', { ascending: false });
-    
     if (deptSlugs) {
       if (Array.isArray(deptSlugs)) {
-        if (deptSlugs.length > 0) {
-          query = query.in('departamento', deptSlugs);
-        }
+        if (deptSlugs.length > 0) query = query.in('departamento', deptSlugs);
       } else {
         query = query.eq('departamento', deptSlugs);
       }
     }
-    
     const { data, error } = await query;
     if (error) throw error;
     return data || [];

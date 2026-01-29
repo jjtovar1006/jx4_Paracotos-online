@@ -5,11 +5,13 @@ import {
   ShoppingBag, Plus, Minus, Trash2, ArrowRight, CheckCircle2, 
   Search, Package, Settings, Upload, LogIn, LogOut,
   Save, X, Edit3, Loader2, RefreshCcw, 
-  ShieldAlert, Users, Lock, UserPlus, Home, MessageCircle, Sparkles
+  ShieldAlert, Users, Lock, UserPlus, Home, MessageCircle, Sparkles, 
+  AlertCircle, Scale, ShieldCheck, FileText, Info, Wand2
 } from 'lucide-react';
 
 import { Product, CartItem, DepartmentSlug, Order, Config, Department, UnidadMedida, AdminUser } from './types';
 import { db, uploadImage } from './services/supabaseService';
+import { generateProductDescription, getCookingTip } from './services/geminiService';
 
 const CONFIG_STUB: Config = {
   tasa_cambio: 36.5,
@@ -41,6 +43,66 @@ const Badge: React.FC<{ children: React.ReactNode; variant?: 'success' | 'warnin
     info: 'bg-blue-100 text-blue-700 border-blue-200',
   };
   return <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border uppercase ${styles[variant]}`}>{children}</span>;
+};
+
+const PoliciesView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+  return (
+    <div className="px-6 py-10 max-w-3xl mx-auto animate-fade-in pb-40">
+      <button onClick={onBack} className="flex items-center gap-2 text-primary/40 font-bold mb-8 hover:text-primary transition-colors">
+        <ArrowRight className="rotate-180" size={18} /> Volver
+      </button>
+      
+      <div className="text-center mb-12">
+        <Scale className="mx-auto text-accent mb-4" size={48} />
+        <h2 className="text-4xl font-black text-primary tracking-tighter">Políticas y Condiciones</h2>
+        <p className="text-primary/50 font-medium">JX4 Paracotos Online • Marco Legal Venezuela</p>
+      </div>
+
+      <div className="space-y-8 text-sm leading-relaxed text-primary/80">
+        <section className="glassmorphism p-8 rounded-[2.5rem] border border-white shadow-sm">
+          <div className="flex items-center gap-3 mb-4 text-primary">
+            <Info className="text-accent" size={24} />
+            <h3 className="text-xl font-black">1. Términos de Uso</h3>
+          </div>
+          <div className="space-y-4">
+            <p><strong>Naturaleza del Servicio:</strong> JX4 Paracotos Online es estrictamente un Catálogo Digital Informativo. La plataforma facilita el encuentro entre comerciantes y potenciales clientes.</p>
+            <div className="bg-amber-50 border-l-4 border-accent p-4 rounded-r-xl italic text-accent-dark font-medium">
+              Importante: No somos una plataforma de venta, ni procesamos pagos, ni gestionamos envíos.
+            </div>
+            <p><strong>Deslinde de Responsabilidad:</strong> Cualquier transacción comercial, acuerdo de pago o entrega se realiza fuera de la aplicación y directamente entre el usuario y el anunciante. No garantizamos la calidad, seguridad o existencia de los productos anunciados.</p>
+          </div>
+        </section>
+
+        <section className="glassmorphism p-8 rounded-[2.5rem] border border-white shadow-sm">
+          <div className="flex items-center gap-3 mb-4 text-primary">
+            <ShieldCheck className="text-accent" size={24} />
+            <h3 className="text-xl font-black">2. Seguridad y Privacidad</h3>
+          </div>
+          <p>Basado en el Art. 60 de la CRBV, respetamos la privacidad de tus datos:</p>
+          <ul className="list-disc ml-6 mt-4 space-y-2">
+            <li><strong>Recolección:</strong> Solo solicitamos datos necesarios para el contacto (Nombre, Teléfono, Dirección).</li>
+            <li><strong>Uso:</strong> Los datos se usan exclusivamente para la gestión de pedidos vía WhatsApp. No vendemos bases de datos a terceros.</li>
+            <li><strong>Seguridad:</strong> Aplicamos medidas técnicas según la Ley Especial contra los Delitos Informáticos.</li>
+          </ul>
+        </section>
+
+        <section className="glassmorphism p-8 rounded-[2.5rem] border border-white shadow-sm">
+          <div className="flex items-center gap-3 mb-4 text-primary">
+            <FileText className="text-accent" size={24} />
+            <h3 className="text-xl font-black">3. Base Legal (Venezuela)</h3>
+          </div>
+          <p>Estas políticas se fundamentan en el ordenamiento jurídico vigente:</p>
+          <ul className="list-disc ml-6 mt-4 space-y-2 font-medium opacity-70">
+            <li>Constitución de la República Bolivariana de Venezuela (CRBV).</li>
+            <li>Ley sobre Mensajes de Datos y Firmas Electrónicas.</li>
+            <li>Ley Especial contra los Delitos Informáticos.</li>
+            <li>Ley Orgánica de Precios Justos.</li>
+            <li>Código Civil de Venezuela.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  );
 };
 
 const ImageUploader: React.FC<{ 
@@ -114,6 +176,7 @@ const AdminPanel: React.FC<{
   const [editingAdmin, setEditingAdmin] = useState<Partial<AdminUser> | null>(null);
   const [localConfig, setLocalConfig] = useState<Config>(config);
   const [saving, setSaving] = useState(false);
+  const [generatingAI, setGeneratingAI] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
 
@@ -137,11 +200,20 @@ const AdminPanel: React.FC<{
     if (activeTab === 'users') fetchAdmins();
   }, [activeTab]);
 
+  const handleGenerateDescription = async () => {
+    if (!editingProduct?.nombre) return alert("Ingresa el nombre del producto primero.");
+    setGeneratingAI(true);
+    try {
+      const desc = await generateProductDescription(editingProduct.nombre, editingProduct.departamento || 'general');
+      setEditingProduct({ ...editingProduct, descripcion: desc });
+    } catch (e) { console.error(e); }
+    finally { setGeneratingAI(false); }
+  };
+
   const handleSaveProduct = async () => {
     setSaving(true);
     try {
       const payload = { ...editingProduct };
-      // Si no es super, y el producto no tiene depto o no pertenece a uno asignado, forzar el primero asignado
       if (!isSuper && (!payload.departamento || !myDeptSlugs.includes(payload.departamento))) {
         payload.departamento = myDeptSlugs[0];
       }
@@ -153,16 +225,13 @@ const AdminPanel: React.FC<{
   };
 
   const handleSaveAdmin = async () => {
-    if (!editingAdmin?.username) return alert("El usuario es obligatorio");
-    if (!editingAdmin?.dept_slugs || editingAdmin.dept_slugs.length === 0) {
-      if (editingAdmin.role !== 'super') return alert("Selecciona al menos un departamento");
-    }
+    if (!editingAdmin?.username) return alert("El nombre de usuario es obligatorio");
     setSaving(true);
     try {
       await db.upsertAdmin(editingAdmin);
       setEditingAdmin(null);
       fetchAdmins();
-    } catch (e: any) { alert("Error: " + e.message); }
+    } catch (e: any) { alert("Error al guardar administrador: " + e.message); }
     finally { setSaving(false); }
   };
 
@@ -171,7 +240,7 @@ const AdminPanel: React.FC<{
     try {
       await db.updateConfig(localConfig);
       onRefresh();
-      alert("Configuración actualizada.");
+      alert("Configuración actualizada correctamente.");
     } catch (e: any) { alert("Error: " + e.message); }
     finally { setSaving(false); }
   };
@@ -203,13 +272,13 @@ const AdminPanel: React.FC<{
       </header>
 
       <div className="flex gap-4 mb-8 overflow-x-auto hide-scrollbar">
-        <button onClick={() => setActiveTab('ventas')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all ${activeTab === 'ventas' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Ventas</button>
-        <button onClick={() => setActiveTab('productos')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all ${activeTab === 'productos' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Productos</button>
+        <button onClick={() => setActiveTab('ventas')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'ventas' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Ventas</button>
+        <button onClick={() => setActiveTab('productos')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'productos' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Productos</button>
         {isSuper && (
           <>
-            <button onClick={() => setActiveTab('depts')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all ${activeTab === 'depts' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Deptos</button>
-            <button onClick={() => setActiveTab('config')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all ${activeTab === 'config' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Configuración</button>
-            <button onClick={() => setActiveTab('users')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all ${activeTab === 'users' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Usuarios</button>
+            <button onClick={() => setActiveTab('depts')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'depts' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Deptos</button>
+            <button onClick={() => setActiveTab('config')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'config' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Configuración</button>
+            <button onClick={() => setActiveTab('users')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'users' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Usuarios</button>
           </>
         )}
       </div>
@@ -248,7 +317,7 @@ const AdminPanel: React.FC<{
 
       {activeTab === 'productos' && (
         <div className="space-y-6">
-          <button onClick={() => setEditingProduct({ nombre: '', descripcion: '', precio: 0, stock: 0, departamento: isSuper ? 'carnes' : myDeptSlugs[0], unidad: 'kg', disponible: true })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Producto</button>
+          <button onClick={() => setEditingProduct({ nombre: '', descripcion: '', precio: 0, stock: 0, departamento: isSuper ? 'carnes' : myDeptSlugs[0], unidad: 'kg', disponible: true })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg hover:bg-primary-dark transition-all active:scale-95"><Plus size={18} /> Nuevo Producto</button>
           <div className="glassmorphism rounded-[2.5rem] overflow-hidden shadow-sm border border-white overflow-x-auto">
             <table className="w-full text-left min-w-[600px]">
               <thead className="bg-primary/5 text-[10px] uppercase font-black text-primary/30"><tr className="p-4"><th></th><th className="p-4">Producto</th><th>Depto</th><th>Precio</th><th className="p-4 text-center">Acciones</th></tr></thead>
@@ -260,13 +329,118 @@ const AdminPanel: React.FC<{
                     <td><Badge>{p.departamento}</Badge></td>
                     <td className="font-bold">${p.precio}</td>
                     <td className="p-4 flex justify-center gap-2">
-                      <button onClick={() => setEditingProduct(p)} className="p-2 text-accent bg-white rounded-lg shadow-sm"><Edit3 size={16} /></button>
-                      <button onClick={async () => { if(confirm("¿Eliminar?")){ await db.deleteProduct(p.id); onRefresh(); } }} className="p-2 text-red-400 bg-white rounded-lg shadow-sm"><Trash2 size={16} /></button>
+                      <button onClick={() => setEditingProduct(p)} className="p-2 text-accent bg-white rounded-lg shadow-sm hover:text-accent-dark"><Edit3 size={16} /></button>
+                      <button onClick={async () => { if(confirm("¿Eliminar?")){ await db.deleteProduct(p.id); onRefresh(); } }} className="p-2 text-red-400 bg-white rounded-lg shadow-sm hover:text-red-600"><Trash2 size={16} /></button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {editingProduct && (
+        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6 overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 my-auto max-h-[90vh] overflow-y-auto">
+             <div className="flex justify-between items-center mb-8">
+               <h3 className="text-3xl font-black text-primary">Editor de Producto</h3>
+               <button onClick={() => setEditingProduct(null)} className="p-2 hover:bg-offwhite rounded-full transition-colors"><X /></button>
+             </div>
+             <div className="space-y-6">
+               <ImageUploader label="Imagen del Producto" currentUrl={editingProduct.imagen_url || ''} onUpload={(url) => setEditingProduct({...editingProduct, imagen_url: url})} />
+               
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Nombre del Producto</label>
+                 <input placeholder="Ej: Picanha Premium" className="w-full bg-offwhite p-4 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" value={editingProduct.nombre} onChange={e => setEditingProduct({...editingProduct, nombre: e.target.value})} />
+               </div>
+
+               <div className="space-y-1 relative">
+                 <div className="flex justify-between items-center pr-2">
+                   <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Descripción</label>
+                   <button 
+                    disabled={generatingAI}
+                    onClick={handleGenerateDescription}
+                    className="flex items-center gap-1 text-[10px] font-black text-accent hover:text-accent-dark transition-colors bg-accent/5 px-2 py-1 rounded-full uppercase"
+                   >
+                     {generatingAI ? <Loader2 className="animate-spin" size={12} /> : <Wand2 size={12} />} IA Mágica
+                   </button>
+                 </div>
+                 <textarea placeholder="Describe el producto..." className="w-full bg-offwhite p-4 rounded-2xl font-bold h-24 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" value={editingProduct.descripcion} onChange={e => setEditingProduct({...editingProduct, descripcion: e.target.value})} />
+               </div>
+
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-1">
+                   <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Precio ($)</label>
+                   <input placeholder="Precio" type="number" step="0.01" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingProduct.precio} onChange={e => setEditingProduct({...editingProduct, precio: parseFloat(e.target.value)})} />
+                 </div>
+                 <div className="space-y-1">
+                   <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Departamento</label>
+                   <select 
+                      className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" 
+                      value={editingProduct.departamento} 
+                      onChange={e => setEditingProduct({...editingProduct, departamento: e.target.value as any})}
+                   >
+                     {departments
+                       .filter(d => isSuper || myDeptSlugs.includes(d.slug))
+                       .map(d => <option key={d.id} value={d.slug}>{d.nombre}</option>)
+                     }
+                   </select>
+                 </div>
+               </div>
+               
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Unidad de Medida</label>
+                 <select className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingProduct.unidad} onChange={e => setEditingProduct({...editingProduct, unidad: e.target.value as any})}>
+                   {UNIDADES.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                 </select>
+               </div>
+
+               <button onClick={handleSaveProduct} disabled={saving} className="w-full bg-primary text-white py-5 rounded-2xl font-black shadow-xl transition-all active:scale-95 flex items-center justify-center">
+                 {saving ? <Loader2 className="animate-spin" /> : "Guardar Producto"}
+               </button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {isSuper && activeTab === 'depts' && (
+        <div className="space-y-6">
+           <button onClick={() => setEditingDept({ nombre: '', slug: '', telefono_whatsapp: '', color_hex: '#3d4a3e' })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Depto</button>
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+             {departments.map(d => (
+               <div key={d.id} className="glassmorphism p-6 rounded-[2rem] border-t-8 border-white shadow-sm" style={{ borderTopColor: d.color_hex }}>
+                 <div className="flex justify-between items-start mb-4">
+                   <h3 className="font-black text-lg">{d.nombre}</h3>
+                   <div className="flex gap-2">
+                     <button onClick={() => setEditingDept(d)} className="p-2 bg-white rounded-lg shadow-sm hover:bg-primary/5 transition-colors"><Edit3 size={14} /></button>
+                     <button onClick={async () => { if(confirm("¿Eliminar departamento?")){ await db.deleteDepartment(d.id); onRefresh(); } }} className="p-2 bg-white text-red-400 rounded-lg shadow-sm hover:bg-red-50 transition-colors"><Trash2 size={14} /></button>
+                   </div>
+                 </div>
+                 <p className="text-[10px] font-black text-primary/30 uppercase tracking-widest">+{d.telefono_whatsapp}</p>
+               </div>
+             ))}
+           </div>
+        </div>
+      )}
+
+      {editingDept && (
+        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6 overflow-y-auto">
+          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 shadow-2xl animate-in slide-in-from-bottom-10 my-auto">
+             <div className="flex justify-between items-center mb-6">
+               <h3 className="text-2xl font-black text-primary">Gestionar Departamento</h3>
+               <button onClick={() => setEditingDept(null)}><X /></button>
+             </div>
+             <div className="space-y-4">
+               <input placeholder="Nombre" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingDept.nombre} onChange={e => setEditingDept({...editingDept, nombre: e.target.value})} />
+               <input placeholder="Slug" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingDept.slug} onChange={e => setEditingDept({...editingDept, slug: e.target.value?.toLowerCase().replace(/\s+/g, '-') as any})} />
+               <input placeholder="WhatsApp (Ej: 584241112233)" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingDept.telefono_whatsapp} onChange={e => setEditingDept({...editingDept, telefono_whatsapp: e.target.value})} />
+               <div className="flex items-center gap-4 bg-offwhite p-4 rounded-xl">
+                 <span className="text-xs font-bold text-primary/50 uppercase">Color de Marca:</span>
+                 <input type="color" className="w-12 h-12 rounded-lg cursor-pointer bg-transparent border-none" value={editingDept.color_hex} onChange={e => setEditingDept({...editingDept, color_hex: e.target.value})} />
+               </div>
+               <button onClick={async () => { await db.upsertDepartment(editingDept); setEditingDept(null); onRefresh(); }} className="w-full bg-primary text-white py-4 rounded-2xl font-black shadow-lg transition-all active:scale-95">Guardar Cambios</button>
+             </div>
           </div>
         </div>
       )}
@@ -290,7 +464,7 @@ const AdminPanel: React.FC<{
                  <div className="flex gap-2">
                     <button onClick={() => setEditingAdmin(admin)} className="p-2 text-accent bg-white rounded-lg shadow-sm"><Edit3 size={16} /></button>
                     {admin.role !== 'super' && (
-                      <button onClick={async () => { if(confirm("¿Eliminar admin?")){ await db.deleteAdmin(admin.id); fetchAdmins(); } }} className="p-2 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={18} /></button>
+                      <button onClick={async () => { if(confirm("¿Eliminar administrador?")){ await db.deleteAdmin(admin.id!); fetchAdmins(); } }} className="p-2 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={18} /></button>
                     )}
                  </div>
                </div>
@@ -306,11 +480,11 @@ const AdminPanel: React.FC<{
              <div className="space-y-4">
                <div className="space-y-1">
                  <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Usuario</label>
-                 <input placeholder="Usuario" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingAdmin.username} onChange={e => setEditingAdmin({...editingAdmin, username: e.target.value})} />
+                 <input placeholder="Nombre de usuario" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingAdmin.username} onChange={e => setEditingAdmin({...editingAdmin, username: e.target.value})} />
                </div>
                <div className="space-y-1">
                  <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Contraseña {editingAdmin.id && "(dejar vacío para no cambiar)"}</label>
-                 <input placeholder="Contraseña" type="text" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingAdmin.password} onChange={e => setEditingAdmin({...editingAdmin, password: e.target.value})} />
+                 <input placeholder="Contraseña" type="text" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingAdmin.password || ''} onChange={e => setEditingAdmin({...editingAdmin, password: e.target.value})} />
                </div>
                
                <div className="space-y-1">
@@ -361,12 +535,15 @@ const AdminPanel: React.FC<{
         <div className="glassmorphism p-8 rounded-[2.5rem] space-y-6 shadow-sm border border-white">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-4">
-              <ImageUploader label="Logo" currentUrl={localConfig.logo_url} onUpload={(url) => setLocalConfig({...localConfig, logo_url: url})} />
+              <ImageUploader label="Logo de la Aplicación" currentUrl={localConfig.logo_url} onUpload={(url) => setLocalConfig({...localConfig, logo_url: url})} />
               <input className="w-full bg-white p-4 rounded-xl border border-primary/5 font-bold outline-none" value={localConfig.slogan} onChange={e => setLocalConfig({...localConfig, slogan: e.target.value})} placeholder="Slogan" />
             </div>
             <div className="space-y-4">
-              <input className="w-full bg-white p-4 rounded-xl border border-primary/5 font-bold outline-none" value={localConfig.cintillo_promocional} onChange={e => setLocalConfig({...localConfig, cintillo_promocional: e.target.value})} placeholder="Cintillo" />
-              <input type="number" className="w-full bg-white p-4 rounded-xl border border-primary/5 font-black text-accent outline-none" value={localConfig.tasa_cambio} onChange={e => setLocalConfig({...localConfig, tasa_cambio: parseFloat(e.target.value)})} placeholder="Tasa" />
+              <input className="w-full bg-white p-4 rounded-xl border border-primary/5 font-bold outline-none" value={localConfig.cintillo_promocional} onChange={e => setLocalConfig({...localConfig, cintillo_promocional: e.target.value})} placeholder="Cintillo Informativo" />
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Tasa del Día (Bs/$)</label>
+                <input type="number" step="0.01" className="w-full bg-white p-4 rounded-xl border border-primary/5 font-black text-accent outline-none" value={localConfig.tasa_cambio} onChange={e => setLocalConfig({...localConfig, tasa_cambio: parseFloat(e.target.value)})} placeholder="Tasa BCV" />
+              </div>
             </div>
           </div>
           <button onClick={handleSaveConfig} disabled={saving} className="flex items-center gap-2 bg-primary text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-primary/20 transition-all active:scale-95">
@@ -374,82 +551,61 @@ const AdminPanel: React.FC<{
           </button>
         </div>
       )}
+    </div>
+  );
+};
 
-      {editingProduct && (
-        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6 overflow-y-auto">
-          <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 my-auto max-h-[90vh] overflow-y-auto">
-             <div className="flex justify-between items-center mb-8">
-               <h3 className="text-3xl font-black text-primary">Editor de Producto</h3>
-               <button onClick={() => setEditingProduct(null)} className="p-2 hover:bg-offwhite rounded-full transition-colors"><X /></button>
-             </div>
-             <div className="space-y-6">
-               <ImageUploader label="Imagen del Producto" currentUrl={editingProduct.imagen_url || ''} onUpload={(url) => setEditingProduct({...editingProduct, imagen_url: url})} />
-               <input placeholder="Nombre" className="w-full bg-offwhite p-4 rounded-2xl font-bold outline-none" value={editingProduct.nombre} onChange={e => setEditingProduct({...editingProduct, nombre: e.target.value})} />
-               <textarea placeholder="Descripción" className="w-full bg-offwhite p-4 rounded-2xl font-bold h-24 outline-none resize-none" value={editingProduct.descripcion} onChange={e => setEditingProduct({...editingProduct, descripcion: e.target.value})} />
-               <div className="grid grid-cols-2 gap-4">
-                 <input placeholder="Precio" type="number" step="0.01" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingProduct.precio} onChange={e => setEditingProduct({...editingProduct, precio: parseFloat(e.target.value)})} />
-                 <select 
-                    className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" 
-                    value={editingProduct.departamento} 
-                    onChange={e => setEditingProduct({...editingProduct, departamento: e.target.value as any})}
-                 >
-                   {departments
-                     .filter(d => isSuper || myDeptSlugs.includes(d.slug))
-                     .map(d => <option key={d.id} value={d.slug}>{d.nombre}</option>)
-                   }
-                 </select>
-               </div>
-               <select className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingProduct.unidad} onChange={e => setEditingProduct({...editingProduct, unidad: e.target.value as any})}>
-                 {UNIDADES.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-               </select>
-               <button onClick={handleSaveProduct} disabled={saving} className="w-full bg-primary text-white py-5 rounded-2xl font-black shadow-xl transition-all active:scale-95 flex items-center justify-center">
-                 {saving ? <Loader2 className="animate-spin" /> : "Guardar Producto"}
-               </button>
-             </div>
+const ProductCard: React.FC<{ product: Product; tasa: number; onAdd: (p: Product) => void }> = ({ product, tasa, onAdd }) => {
+  const [tip, setTip] = useState<string | null>(null);
+  const [loadingTip, setLoadingTip] = useState(false);
+
+  const fetchTip = async () => {
+    if (tip) return setTip(null); // Toggle
+    setLoadingTip(true);
+    try {
+      const result = await getCookingTip(product.nombre);
+      setTip(result);
+    } catch (e) { setTip("Mantener fresco."); }
+    finally { setLoadingTip(false); }
+  };
+
+  return (
+    <div className="glassmorphism rounded-[2rem] overflow-hidden group hover:-translate-y-1 transition-all duration-300 shadow-sm border border-white flex flex-col h-full">
+      <div className="aspect-square relative overflow-hidden bg-white shrink-0">
+        <img src={product.imagen_url} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+        <div className="absolute top-3 right-3"><Badge variant="primary">{product.unidad}</Badge></div>
+      </div>
+      <div className="p-5 flex flex-col flex-grow">
+        <div className="flex justify-between items-start mb-1 gap-2">
+          <h3 className="font-bold text-lg leading-tight">{product.nombre}</h3>
+          <button 
+            onClick={fetchTip}
+            title="Sugerencia IA"
+            className="p-1.5 rounded-full bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all shrink-0"
+          >
+            {loadingTip ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />}
+          </button>
+        </div>
+        
+        {tip && (
+          <div className="mb-3 p-3 bg-accent/5 rounded-xl border border-accent/10 animate-in slide-in-from-top-2">
+            <p className="text-[10px] font-black text-accent uppercase mb-1">Tip de JX4:</p>
+            <p className="text-[11px] font-medium text-primary/70 italic leading-snug">"{tip}"</p>
           </div>
-        </div>
-      )}
+        )}
 
-      {isSuper && activeTab === 'depts' && (
-        <div className="space-y-6">
-           <button onClick={() => setEditingDept({ nombre: '', slug: '', telefono_whatsapp: '', color_hex: '#3d4a3e' })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Depto</button>
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-             {departments.map(d => (
-               <div key={d.id} className="glassmorphism p-6 rounded-[2rem] border-t-8 border-white shadow-sm" style={{ borderTopColor: d.color_hex }}>
-                 <div className="flex justify-between items-start mb-4">
-                   <h3 className="font-black text-lg">{d.nombre}</h3>
-                   <div className="flex gap-2">
-                     <button onClick={() => setEditingDept(d)} className="p-2 bg-white rounded-lg shadow-sm hover:bg-primary/5 transition-colors"><Edit3 size={14} /></button>
-                     <button onClick={async () => { if(confirm("¿Eliminar?")){ await db.deleteDepartment(d.id); onRefresh(); } }} className="p-2 bg-white text-red-400 rounded-lg shadow-sm hover:bg-red-50 transition-colors"><Trash2 size={14} /></button>
-                   </div>
-                 </div>
-                 <p className="text-[10px] font-black text-primary/30 uppercase">+{d.telefono_whatsapp}</p>
-               </div>
-             ))}
-           </div>
-        </div>
-      )}
-
-      {editingDept && (
-        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6 overflow-y-auto">
-          <div className="bg-white w-full max-md rounded-[3rem] p-10 shadow-2xl animate-in slide-in-from-bottom-10 my-auto">
-             <div className="flex justify-between items-center mb-6">
-               <h3 className="text-2xl font-black text-primary">Gestionar Departamento</h3>
-               <button onClick={() => setEditingDept(null)}><X /></button>
-             </div>
-             <div className="space-y-4">
-               <input placeholder="Nombre" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingDept.nombre} onChange={e => setEditingDept({...editingDept, nombre: e.target.value})} />
-               <input placeholder="Slug" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingDept.slug} onChange={e => setEditingDept({...editingDept, slug: e.target.value?.toLowerCase().replace(/\s+/g, '-') as any})} />
-               <input placeholder="WhatsApp" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingDept.telefono_whatsapp} onChange={e => setEditingDept({...editingDept, telefono_whatsapp: e.target.value})} />
-               <div className="flex items-center gap-4 bg-offwhite p-4 rounded-xl">
-                 <span className="text-xs font-bold text-primary/50 uppercase">Color de Marca:</span>
-                 <input type="color" className="w-12 h-12 rounded-lg cursor-pointer bg-transparent border-none" value={editingDept.color_hex} onChange={e => setEditingDept({...editingDept, color_hex: e.target.value})} />
-               </div>
-               <button onClick={async () => { await db.upsertDepartment(editingDept); setEditingDept(null); onRefresh(); }} className="w-full bg-primary text-white py-4 rounded-2xl font-black shadow-lg transition-all active:scale-95">Guardar Cambios</button>
-             </div>
+        <p className="text-xs text-primary/50 mb-4 line-clamp-2 min-h-[2.5rem] flex-grow">{product.descripcion || 'Sin descripción disponible.'}</p>
+        
+        <div className="flex justify-between items-center mt-auto">
+          <div>
+            <div className="text-xl font-black text-primary">${product.precio.toFixed(2)}</div>
+            <div className="text-[10px] font-bold text-primary/30">Bs. {(product.precio * tasa).toFixed(2)}</div>
           </div>
+          <button onClick={() => onAdd(product)} className="bg-primary text-white p-3 rounded-2xl hover:bg-accent transition-all shadow-lg active:scale-95">
+            <Plus size={20} />
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 };
@@ -506,25 +662,7 @@ const HomeView: React.FC<{
 
       <div className="px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {filtered.length > 0 ? filtered.map(p => (
-          <div key={p.id} className="glassmorphism rounded-[2rem] overflow-hidden group hover:-translate-y-1 transition-all duration-300 shadow-sm border border-white">
-            <div className="aspect-square relative overflow-hidden bg-white">
-              <img src={p.imagen_url} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
-              <div className="absolute top-3 right-3"><Badge variant="primary">{p.unidad}</Badge></div>
-            </div>
-            <div className="p-5">
-              <h3 className="font-bold text-lg mb-1">{p.nombre}</h3>
-              <p className="text-xs text-primary/50 mb-4 line-clamp-2 min-h-[2.5rem]">{p.descripcion || 'Sin descripción disponible.'}</p>
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className="text-xl font-black text-primary">${p.precio.toFixed(2)}</div>
-                  <div className="text-[10px] font-bold text-primary/30">Bs. {(p.precio * config.tasa_cambio).toFixed(2)}</div>
-                </div>
-                <button onClick={() => onAddToCart(p)} className="bg-primary text-white p-3 rounded-2xl hover:bg-accent transition-all shadow-lg active:scale-95">
-                  <Plus size={20} />
-                </button>
-              </div>
-            </div>
-          </div>
+          <ProductCard key={p.id} product={p} tasa={config.tasa_cambio} onAdd={onAddToCart} />
         )) : (
           <div className="col-span-full py-20 text-center">
             <Package className="mx-auto text-primary/10 mb-4" size={64} />
@@ -564,11 +702,7 @@ const CheckoutView: React.FC<{
           setFound(true);
           setTimeout(() => setFound(false), 3000);
         }
-      } catch (e) {
-        console.error("Error buscando cliente:", e);
-      } finally {
-        setSearching(false);
-      }
+      } catch (e) { console.error(e); } finally { setSearching(false); }
     }
   };
 
@@ -586,71 +720,23 @@ const CheckoutView: React.FC<{
         });
       }} className="space-y-6">
         <div className="glassmorphism p-6 rounded-[2rem] space-y-4 border border-white relative">
-          
           <div className="relative">
-            <input 
-              required 
-              type="tel" 
-              placeholder="WhatsApp (Ej: 04123868364)" 
-              className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" 
-              value={formData.telefono}
-              onChange={e => handlePhoneChange(e.target.value)}
-            />
+            <input required type="tel" placeholder="WhatsApp (Ej: 04123868364)" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" value={formData.telefono} onChange={e => handlePhoneChange(e.target.value)} />
             {searching && <Loader2 className="absolute right-4 top-4 animate-spin text-accent" size={20} />}
-            {found && (
-              <div className="absolute -top-3 left-4 bg-accent text-white text-[9px] font-black px-2 py-1 rounded-full flex items-center gap-1 animate-bounce">
-                <Sparkles size={10} /> ¡BIENVENIDO DE NUEVO!
-              </div>
-            )}
+            {found && <div className="absolute -top-3 left-4 bg-accent text-white text-[9px] font-black px-2 py-1 rounded-full flex items-center gap-1 animate-bounce"><Sparkles size={10} /> ¡CLIENTE FRECUENTE!</div>}
           </div>
-
-          <input 
-            required 
-            placeholder="Nombre Completo" 
-            className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" 
-            value={formData.nombre}
-            onChange={e => setFormData({...formData, nombre: e.target.value})}
-          />
-          
-          <textarea 
-            required 
-            placeholder="Dirección exacta para la entrega" 
-            className="w-full bg-offwhite p-4 rounded-xl font-bold h-24 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" 
-            value={formData.direccion}
-            onChange={e => setFormData({...formData, direccion: e.target.value})}
-          />
-          
-          <textarea 
-            placeholder="¿Alguna nota adicional? (Ej: Pago en destino, cambio de $20...)" 
-            className="w-full bg-offwhite p-4 rounded-xl font-bold h-20 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" 
-            value={formData.notas}
-            onChange={e => setFormData({...formData, notas: e.target.value})}
-          />
+          <input required placeholder="Nombre Completo" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
+          <textarea required placeholder="Dirección para la entrega" className="w-full bg-offwhite p-4 rounded-xl font-bold h-24 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} />
+          <textarea placeholder="Notas adicionales..." className="w-full bg-offwhite p-4 rounded-xl font-bold h-20 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" value={formData.notas} onChange={e => setFormData({...formData, notas: e.target.value})} />
         </div>
-
         <div className="glassmorphism p-6 rounded-[2rem] border border-white text-center">
           <h3 className="text-xs font-black uppercase text-primary/30 mb-4 tracking-widest">Método de Entrega</h3>
           <div className="grid grid-cols-2 gap-4">
-            <button 
-              type="button"
-              onClick={() => setFormData({...formData, entrega: 'retiro'})}
-              className={`flex items-center justify-center gap-2 p-4 rounded-xl font-bold transition-all border-2 ${formData.entrega === 'retiro' ? 'bg-white border-accent' : 'bg-offwhite border-transparent'}`}
-            >
-              Retiro en Tienda
-            </button>
-            <button 
-              type="button"
-              onClick={() => setFormData({...formData, entrega: 'delivery'})}
-              className={`flex items-center justify-center gap-2 p-4 rounded-xl font-bold transition-all border-2 ${formData.entrega === 'delivery' ? 'bg-white border-accent' : 'bg-offwhite border-transparent'}`}
-            >
-              Delivery
-            </button>
+            <button type="button" onClick={() => setFormData({...formData, entrega: 'retiro'})} className={`p-4 rounded-xl font-bold transition-all border-2 ${formData.entrega === 'retiro' ? 'bg-white border-accent' : 'bg-offwhite border-transparent'}`}>Retiro en Tienda</button>
+            <button type="button" onClick={() => setFormData({...formData, entrega: 'delivery'})} className={`p-4 rounded-xl font-bold transition-all border-2 ${formData.entrega === 'delivery' ? 'bg-white border-accent' : 'bg-offwhite border-transparent'}`}>Delivery</button>
           </div>
         </div>
-        
-        <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all active:scale-95">
-          Finalizar Pedido
-        </button>
+        <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all active:scale-95">Finalizar Pedido</button>
       </form>
     </div>
   );
@@ -661,30 +747,28 @@ const App: React.FC = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [config, setConfig] = useState<Config>(CONFIG_STUB);
   const [loading, setLoading] = useState(true);
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [view, setView] = useState<'home' | 'cart' | 'checkout' | 'success' | 'admin' | 'login'>('home');
+  const [view, setView] = useState<'home' | 'cart' | 'checkout' | 'success' | 'admin' | 'login' | 'policies'>('home');
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
 
   const refreshData = async () => {
     setLoading(true);
     try {
-      const pResult = await db.getProducts();
-      const dResult = await db.getDepartments();
-      const cResult = await db.getConfig();
+      const [pResult, dResult, cResult] = await Promise.all([db.getProducts(), db.getDepartments(), db.getConfig()]);
       setProducts(pResult);
       setDepartments(dResult);
       if (cResult) setConfig(cResult);
-    } catch (e: any) { 
-      console.error("Error al refrescar datos:", e.message);
-    } finally { setLoading(false); }
+    } catch (e: any) { console.error("Refresh Error:", e.message); } finally { setLoading(false); }
   };
 
   useEffect(() => { refreshData(); }, []);
 
   const addToCart = (p: Product) => {
     if (cart.length > 0 && cart[0].departamento !== p.departamento) {
-      alert("⚠️ Estás comprando en un departamento diferente. Finaliza tu pedido actual primero.");
+      alert("⚠️ Finaliza tu compra en este departamento antes de cambiar.");
       return;
     }
     setCart(prev => {
@@ -705,7 +789,7 @@ const App: React.FC = () => {
       productos: cart,
       total: totalUSD,
       total_bs: totalUSD * config.tasa_cambio,
-      metodo_pago: orderData.metodo_pago || 'pago_movil',
+      metodo_pago: 'pago_movil',
       metodo_entrega: orderData.metodo_entrega || 'retiro',
       estado: 'pendiente',
       departamento: cart[0].departamento,
@@ -717,93 +801,61 @@ const App: React.FC = () => {
       setCurrentOrder(order);
       setCart([]);
       setView('success');
-      
-      const deptInfo = departments.find(d => d.slug === order.departamento);
-      
-      const productosTexto = order.productos
-        .map(p => `📦 *${p.nombre}* x${p.quantity}\n   _Subtotal: USD ${(p.precio * p.quantity).toFixed(2)}_`)
-        .join('\n\n');
-
-      const text = 
-`👤 *CLIENTE:*
-• Nombre: *${order.nombre_cliente.toUpperCase()}*
-• WhatsApp: ${order.telefono_cliente}
-• Método: ${order.metodo_entrega === 'retiro' ? '🏪 Retiro en Tienda' : '🚚 Delivery'}
-
-
-🛍️ *PRODUCTOS:*
-${productosTexto}
-
----------------------------------------
-💵 *TOTAL USD:* *USD ${order.total.toFixed(2)}*
-
-💰 *Total VES:* Bs.S ${order.total_bs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-   _(Tasa: ${config.tasa_cambio})_
-
-
-📝 *NOTAS:* _${order.notas || 'Sin notas adicionales.'}_
-
-📍 *Paracotos, Edo. Miranda*
-_Generado desde Jx4 Catálogo_`;
-
-      window.open(`https://wa.me/${deptInfo?.telefono_whatsapp || config.whatsapp_general}?text=${encodeURIComponent(text)}`, '_blank');
-    } catch (e: any) { alert("Error: " + e.message); }
+      const dept = departments.find(d => d.slug === order.departamento);
+      const text = `🛒 *NUEVO PEDIDO JX4*\n--------------------\n👤 *Cliente:* ${order.nombre_cliente.toUpperCase()}\n📞 *WhatsApp:* ${order.telefono_cliente}\n🚚 *Método:* ${order.metodo_entrega}\n\n📦 *PRODUCTOS:*\n${order.productos.map(p => `- ${p.nombre} x${p.quantity} ($${(p.precio * p.quantity).toFixed(2)})`).join('\n')}\n\n💵 *TOTAL USD:* $${order.total.toFixed(2)}\n💰 *TOTAL BS:* Bs. ${order.total_bs.toLocaleString('es-VE')}\n\n📍 *Dirección:* ${order.direccion}\n📝 *Notas:* ${order.notas || 'Sin notas.'}`;
+      window.open(`https://wa.me/${dept?.telefono_whatsapp || config.whatsapp_general}?text=${encodeURIComponent(text)}`, '_blank');
+    } catch (e: any) { alert("Error al guardar: " + e.message); }
   };
 
-  const totalCart = cart.reduce((acc, i) => acc + i.quantity, 0);
+  const totalCartItems = cart.reduce((acc, i) => acc + i.quantity, 0);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-offwhite"><Loader2 className="animate-spin text-primary" size={64} /></div>;
 
   return (
     <HashRouter>
-      <div className="min-h-screen bg-offwhite pb-32">
-        <main className="max-w-7xl mx-auto">
+      <div className="min-h-screen bg-offwhite pb-32 flex flex-col">
+        <main className="max-w-7xl mx-auto w-full flex-grow">
           {view === 'home' && <HomeView products={products} departments={departments} onAddToCart={addToCart} config={config} />}
-          
-          {view === 'admin' && currentUser && (
-            <AdminPanel 
-              currentUser={currentUser}
-              products={products} 
-              departments={departments} 
-              config={config} 
-              onRefresh={refreshData} 
-              onLogout={() => { setCurrentUser(null); setView('home'); }} 
-            />
-          )}
-
+          {view === 'policies' && <PoliciesView onBack={() => setView('home')} />}
+          {view === 'admin' && currentUser && <AdminPanel currentUser={currentUser} products={products} departments={departments} config={config} onRefresh={refreshData} onLogout={() => { setCurrentUser(null); setView('home'); }} />}
           {view === 'login' && (
-            <div className="min-h-screen flex items-center justify-center p-6 animate-fade-in">
-               <form onSubmit={async (e) => {
-                 e.preventDefault();
-                 const fd = new FormData(e.currentTarget);
-                 try {
-                   const user = await db.login(fd.get('u') as string, fd.get('p') as string);
-                   setCurrentUser(user);
-                   setView('admin');
-                 } catch (e: any) { alert(e.message); }
-               }} className="glassmorphism p-12 rounded-[3rem] w-full max-w-md space-y-8 shadow-2xl border border-white">
-                 <div className="text-center">
-                    <div className="bg-primary w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-white mb-6"><LogIn size={32} /></div>
-                    <h2 className="text-3xl font-black text-primary">Acceso Gestión</h2>
-                 </div>
-                 <div className="space-y-4">
-                    <input name="u" required placeholder="Usuario" className="w-full bg-white p-5 rounded-2xl font-bold outline-none" />
-                    <input name="p" type="password" required placeholder="Clave" className="w-full bg-white p-5 rounded-2xl font-bold outline-none" />
-                 </div>
-                 <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all">Acceder</button>
-               </form>
-            </div>
+             <div className="min-h-screen flex items-center justify-center p-6 animate-fade-in">
+               <div className="w-full max-w-md">
+                 <form onSubmit={async (e) => {
+                   e.preventDefault();
+                   setLoggingIn(true);
+                   const fd = new FormData(e.currentTarget);
+                   try {
+                     const user = await db.login(fd.get('u') as string, fd.get('p') as string);
+                     setCurrentUser(user);
+                     setView('admin');
+                   } catch (e: any) { setLoginError(e.message); }
+                   finally { setLoggingIn(false); }
+                 }} className="glassmorphism p-10 rounded-[3rem] space-y-8 shadow-2xl border border-white">
+                   <div className="text-center">
+                      <div className="bg-primary w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-white mb-6"><LogIn size={32} /></div>
+                      <h2 className="text-3xl font-black text-primary">Acceso Gestión</h2>
+                   </div>
+                   {loginError && <div className="bg-red-50 p-4 rounded-2xl flex items-start gap-3 text-red-600 font-bold text-xs"><AlertCircle size={20} />{loginError}</div>}
+                   <div className="space-y-4">
+                      <input name="u" required placeholder="Usuario" className="w-full bg-white p-5 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" />
+                      <input name="p" type="password" required placeholder="Clave" className="w-full bg-white p-5 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" />
+                   </div>
+                   <div className="text-[10px] text-primary/40 text-center font-bold">Al acceder, aceptas nuestros <button type="button" onClick={() => setView('policies')} className="text-accent underline">Términos y Condiciones</button>.</div>
+                   <button disabled={loggingIn} type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all flex items-center justify-center">{loggingIn ? <Loader2 className="animate-spin" /> : "Acceder"}</button>
+                 </form>
+               </div>
+             </div>
           )}
-
           {view === 'cart' && (
              <div className="px-6 py-20 max-w-2xl mx-auto animate-fade-in">
                 <h2 className="text-4xl font-black mb-10 text-primary">Tu Carrito</h2>
                 {cart.length === 0 ? (
-                  <div className="text-center py-20"><ShoppingBag className="mx-auto text-primary/5 mb-4" size={80} /><p className="text-primary/20 font-black">Tu bolsa está vacía.</p></div>
+                  <div className="text-center py-20"><ShoppingBag className="mx-auto text-primary/5 mb-4" size={80} /><p className="text-primary/20 font-black">Carrito vacío.</p></div>
                 ) : (
                   <div className="space-y-4">
                      {cart.map(i => (
-                       <div key={i.id} className="glassmorphism p-4 rounded-[2rem] flex items-center gap-4 shadow-sm border border-white">
+                       <div key={i.id} className="glassmorphism p-4 rounded-[2rem] flex items-center gap-4 border border-white">
                          <img src={i.imagen_url} className="w-20 h-20 rounded-2xl object-cover bg-white" />
                          <div className="flex-1">
                            <h4 className="font-bold text-primary">{i.nombre}</h4>
@@ -814,10 +866,10 @@ _Generado desde Jx4 Catálogo_`;
                            <span className="font-black text-sm">{i.quantity}</span>
                            <button onClick={() => setCart(cart.map(x => x.id === i.id ? {...x, quantity: Math.max(1, x.quantity - 1)} : x))}><Minus size={14} /></button>
                          </div>
-                         <button onClick={() => setCart(cart.filter(x => x.id !== i.id))} className="text-red-300 p-2 hover:bg-red-50 rounded-full transition-colors"><Trash2 size={20} /></button>
+                         <button onClick={() => setCart(cart.filter(x => x.id !== i.id))} className="text-red-300 p-2"><Trash2 size={20} /></button>
                        </div>
                      ))}
-                     <div className="p-10 glassmorphism rounded-[2.5rem] mt-10 shadow-xl border border-white text-center">
+                     <div className="p-10 glassmorphism rounded-[2.5rem] mt-10 text-center">
                         <div className="flex justify-between items-center font-black text-4xl mb-6 text-primary tracking-tighter"><span>Total:</span> <span>${cart.reduce((a,b) => a+(b.precio*b.quantity), 0).toFixed(2)}</span></div>
                         <button onClick={() => setView('checkout')} className="w-full bg-primary text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-2xl hover:bg-accent transition-all active:scale-95">Continuar <ArrowRight size={24} /></button>
                      </div>
@@ -825,24 +877,29 @@ _Generado desde Jx4 Catálogo_`;
                 )}
              </div>
           )}
-
           {view === 'checkout' && <CheckoutView onFinalize={finalizeOrder} />}
-
           {view === 'success' && currentOrder && (
             <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-fade-in">
                <div className="w-32 h-32 bg-green-50 rounded-full flex items-center justify-center mb-10 border border-green-100"><CheckCircle2 size={80} className="text-green-500" /></div>
                <h2 className="text-5xl font-black mb-6 tracking-tighter text-primary">¡Pedido Enviado!</h2>
-               <p className="text-primary/50 mb-12 max-w-sm text-lg">Tu orden <strong>{currentOrder.order_id}</strong> se ha procesado exitosamente. Recibirás respuesta por WhatsApp.</p>
+               <p className="text-primary/50 mb-12 max-w-sm text-lg">Tu orden <strong>{currentOrder.order_id}</strong> ha sido enviada. Serás atendido por WhatsApp.</p>
                <button onClick={() => setView('home')} className="bg-primary text-white px-16 py-5 rounded-2xl font-black text-xl shadow-2xl transition-all active:scale-95">Volver al Inicio</button>
             </div>
           )}
         </main>
 
+        <footer className="w-full py-6 px-6 text-center border-t border-primary/5 mb-32 glassmorphism">
+          <p className="text-[9px] font-bold text-primary/40 uppercase tracking-widest leading-relaxed max-w-md mx-auto">
+            Aviso Legal: JX4 Paracotos Online funciona exclusivamente como un catálogo digital informativo. No somos una plataforma de venta ni procesamos pagos.
+          </p>
+          <button onClick={() => setView('policies')} className="mt-2 text-[9px] font-black text-accent uppercase hover:underline">Ver Políticas Completas</button>
+        </footer>
+
         <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md glassmorphism rounded-full px-10 py-5 flex items-center justify-between shadow-2xl z-50 border border-white/40">
           <button onClick={() => setView('home')} className={`p-2 transition-all hover:scale-110 active:scale-90 ${view === 'home' ? 'text-accent scale-125' : 'text-primary/30'}`}><Home size={28} /></button>
           <button onClick={() => setView('cart')} className={`p-2 relative transition-all hover:scale-110 active:scale-90 ${view === 'cart' ? 'text-accent scale-125' : 'text-primary/30'}`}>
             <ShoppingBag size={28} />
-            {totalCart > 0 && <span className="absolute -top-1 -right-1 bg-accent text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-lg">{totalCart}</span>}
+            {totalCartItems > 0 && <span className="absolute -top-1 -right-1 bg-accent text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-lg">{totalCartItems}</span>}
           </button>
           <button onClick={() => currentUser ? setView('admin') : setView('login')} className={`p-2 transition-all hover:scale-110 active:scale-90 ${view === 'admin' || view === 'login' ? 'text-accent scale-125' : 'text-primary/30'}`}><Settings size={28} /></button>
         </nav>
