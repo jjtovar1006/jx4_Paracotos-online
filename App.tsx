@@ -7,10 +7,11 @@ import {
   Settings, Upload, LogIn, LogOut,
   Truck, Store, Bike, Car, HardHat, Save, X, Edit3, AlertCircle,
   Image as ImageIcon, Loader2, RefreshCcw, Clipboard, ExternalLink,
-  WifiOff, Database
+  WifiOff, Database, ShieldAlert, Terminal, FileText, Users, Lock, UserPlus,
+  Home
 } from 'lucide-react';
 
-import { Product, CartItem, DepartmentSlug, Order, Config, Department } from './types';
+import { Product, CartItem, DepartmentSlug, Order, Config, Department, UnidadMedida, AdminUser } from './types';
 import { db, uploadImage } from './services/supabaseService';
 
 const CONFIG_STUB: Config = {
@@ -21,15 +22,28 @@ const CONFIG_STUB: Config = {
   whatsapp_general: '584241112233'
 };
 
+const UNIDADES: { value: UnidadMedida; label: string }[] = [
+  { value: 'und', label: 'Unidad' },
+  { value: 'kg', label: 'Kilogramo (Kg)' },
+  { value: 'gr', label: 'Gramos (gr)' },
+  { value: 'caja', label: 'Caja' },
+  { value: 'paquete', label: 'Paquete' },
+  { value: 'bulto', label: 'Bulto' },
+  { value: 'saco', label: 'Saco' },
+  { value: 'metro', label: 'Metro' },
+  { value: 'litro', label: 'Litro' },
+  { value: 'docena', label: 'Docena' },
+];
+
 const Badge: React.FC<{ children: React.ReactNode; variant?: 'success' | 'warning' | 'error' | 'info' | 'primary' }> = ({ children, variant = 'primary' }) => {
   const styles = {
     primary: 'bg-primary/10 text-primary border-primary/20',
     success: 'bg-green-100 text-green-700 border-green-200',
-    warning: 'bg-amber-100 text-amber-700 border-amber-200',
+    warning: 'bg-amber-100 text-amber-700 border-green-200',
     error: 'bg-red-100 text-red-700 border-red-200',
     info: 'bg-blue-100 text-blue-700 border-blue-200',
   };
-  return <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${styles[variant]}`}>{children}</span>;
+  return <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border uppercase ${styles[variant]}`}>{children}</span>;
 };
 
 const ImageUploader: React.FC<{ 
@@ -82,6 +96,292 @@ const ImageUploader: React.FC<{
         )}
         <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
       </div>
+    </div>
+  );
+};
+
+const AdminPanel: React.FC<{
+  currentUser: AdminUser;
+  products: Product[];
+  departments: Department[];
+  config: Config;
+  onRefresh: () => void;
+  onLogout: () => void;
+}> = ({ currentUser, products, departments, config, onRefresh, onLogout }) => {
+  const isSuper = currentUser.role === 'super';
+  const myDeptSlug = currentUser.dept_slug;
+
+  const [activeTab, setActiveTab] = useState<'ventas' | 'productos' | 'depts' | 'config' | 'users'>('ventas');
+  const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+  const [editingDept, setEditingDept] = useState<Partial<Department> | null>(null);
+  const [editingAdmin, setEditingAdmin] = useState<Partial<AdminUser> | null>(null);
+  const [localConfig, setLocalConfig] = useState<Config>(config);
+  const [saving, setSaving] = useState(false);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [dbError, setDbError] = useState<string | null>(null);
+
+  const fetchOrders = async () => {
+    try {
+      const data = await db.getOrders(isSuper ? undefined : myDeptSlug);
+      setOrders(data);
+    } catch (e: any) { setDbError(e.message); }
+  };
+
+  const fetchAdmins = async () => {
+    if (!isSuper) return;
+    try {
+      const data = await db.getAdmins();
+      setAdmins(data);
+    } catch (e: any) { setDbError(e.message); }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'ventas') fetchOrders();
+    if (activeTab === 'users') fetchAdmins();
+  }, [activeTab]);
+
+  const handleSaveProduct = async () => {
+    setSaving(true);
+    try {
+      const payload = { ...editingProduct };
+      // Forzar depto si no es super
+      if (!isSuper) payload.departamento = myDeptSlug;
+      await db.upsertProduct(payload);
+      setEditingProduct(null);
+      onRefresh();
+    } catch (e: any) { alert("Error: " + e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleSaveAdmin = async () => {
+    setSaving(true);
+    try {
+      await db.upsertAdmin(editingAdmin);
+      setEditingAdmin(null);
+      fetchAdmins();
+    } catch (e: any) { alert("Error: " + e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleSaveConfig = async () => {
+    setSaving(true);
+    try {
+      await db.updateConfig(localConfig);
+      onRefresh();
+      alert("Configuración actualizada.");
+    } catch (e: any) { alert("Error: " + e.message); }
+    finally { setSaving(false); }
+  };
+
+  const filteredProducts = isSuper ? products : products.filter(p => p.departamento === myDeptSlug);
+
+  return (
+    <div className="px-6 py-10 max-w-6xl mx-auto pb-32 animate-fade-in">
+      <header className="flex justify-between items-center mb-10">
+        <div className="flex items-center gap-4">
+           <div className={`p-4 rounded-2xl ${isSuper ? 'bg-accent' : 'bg-primary'} text-white shadow-xl`}>
+             {isSuper ? <ShieldAlert size={32} /> : <Lock size={32} />}
+           </div>
+           <div>
+            <h2 className="text-3xl font-black text-primary">Panel Administrativo</h2>
+            <div className="flex items-center gap-2">
+              <Badge variant={isSuper ? "warning" : "info"}>{isSuper ? "Super Usuario" : "Admin depto: " + myDeptSlug}</Badge>
+              <span className="text-[10px] font-black text-primary/30 uppercase">@{currentUser.username}</span>
+            </div>
+           </div>
+        </div>
+        <div className="flex gap-2">
+           <button onClick={onRefresh} className="p-3 bg-white border border-primary/5 text-primary rounded-xl hover:bg-accent hover:text-white transition-all"><RefreshCcw size={20} /></button>
+           <button onClick={onLogout} className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><LogOut size={20} /></button>
+        </div>
+      </header>
+
+      <div className="flex gap-4 mb-8 overflow-x-auto hide-scrollbar">
+        <button onClick={() => setActiveTab('ventas')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all ${activeTab === 'ventas' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Ventas</button>
+        <button onClick={() => setActiveTab('productos')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all ${activeTab === 'productos' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Productos</button>
+        {isSuper && (
+          <>
+            <button onClick={() => setActiveTab('depts')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all ${activeTab === 'depts' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Deptos</button>
+            <button onClick={() => setActiveTab('config')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all ${activeTab === 'config' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Configuración</button>
+            <button onClick={() => setActiveTab('users')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all ${activeTab === 'users' ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>Usuarios</button>
+          </>
+        )}
+      </div>
+
+      {activeTab === 'ventas' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {orders.map(o => (
+            <div key={o.id} className="glassmorphism p-5 rounded-[2rem] shadow-sm border border-white">
+              <div className="flex justify-between items-start mb-3">
+                <span className="text-[10px] font-black text-primary/20 uppercase">#{o.order_id}</span>
+                <Badge variant="success">${o.total.toFixed(2)}</Badge>
+              </div>
+              <h4 className="font-bold text-lg">{o.nombre_cliente}</h4>
+              <p className="text-xs text-primary/50 mb-3">{o.departamento.toUpperCase()}</p>
+              <div className="flex justify-between items-center text-[10px] font-black uppercase text-primary/30">
+                <span>{new Date(o.fecha_pedido).toLocaleDateString()}</span>
+                <span className="text-accent">{o.metodo_entrega}</span>
+              </div>
+            </div>
+          ))}
+          {orders.length === 0 && <p className="text-primary/20 font-black py-10">No hay ventas registradas.</p>}
+        </div>
+      )}
+
+      {activeTab === 'productos' && (
+        <div className="space-y-6">
+          <button onClick={() => setEditingProduct({ nombre: '', descripcion: '', precio: 0, stock: 0, departamento: isSuper ? 'carnes' : myDeptSlug, unidad: 'kg', disponible: true })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Producto</button>
+          <div className="glassmorphism rounded-[2.5rem] overflow-hidden shadow-sm border border-white">
+            <table className="w-full text-left">
+              <thead className="bg-primary/5 text-[10px] uppercase font-black text-primary/30"><tr className="p-4"><th></th><th className="p-4">Producto</th><th>Depto</th><th>Precio</th><th className="p-4 text-center">Acciones</th></tr></thead>
+              <tbody className="divide-y divide-primary/5">
+                {filteredProducts.map(p => (
+                  <tr key={p.id} className="text-sm font-medium hover:bg-white/40">
+                    <td className="p-4"><img src={p.imagen_url} className="w-10 h-10 rounded-lg object-cover bg-white" /></td>
+                    <td className="font-black">{p.nombre}</td>
+                    <td><Badge>{p.departamento}</Badge></td>
+                    <td className="font-bold">${p.precio}</td>
+                    <td className="p-4 flex justify-center gap-2">
+                      <button onClick={() => setEditingProduct(p)} className="p-2 text-accent bg-white rounded-lg shadow-sm"><Edit3 size={16} /></button>
+                      <button onClick={async () => { if(confirm("¿Eliminar?")){ await db.deleteProduct(p.id); onRefresh(); } }} className="p-2 text-red-400 bg-white rounded-lg shadow-sm"><Trash2 size={16} /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'users' && isSuper && (
+        <div className="space-y-6">
+           <button onClick={() => setEditingAdmin({ username: '', password: '', role: 'dept_admin', dept_slug: departments[0]?.slug })} className="bg-accent text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><UserPlus size={18} /> Crear Administrador</button>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             {admins.map(admin => (
+               <div key={admin.id} className="glassmorphism p-6 rounded-[2rem] flex items-center justify-between border border-white shadow-sm">
+                 <div className="flex items-center gap-4">
+                   <div className={`p-3 rounded-xl ${admin.role === 'super' ? 'bg-accent' : 'bg-primary/10 text-primary'}`}><Users size={20} /></div>
+                   <div>
+                     <p className="font-black text-primary">@{admin.username}</p>
+                     <p className="text-[10px] font-black uppercase text-primary/40">{admin.role === 'super' ? 'Súper' : 'Depto: ' + admin.dept_slug}</p>
+                   </div>
+                 </div>
+                 {admin.role !== 'super' && (
+                    <button onClick={async () => { if(confirm("¿Eliminar admin?")){ await db.deleteAdmin(admin.id); fetchAdmins(); } }} className="p-2 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={18} /></button>
+                 )}
+               </div>
+             ))}
+           </div>
+        </div>
+      )}
+
+      {/* Editor de Admin */}
+      {editingAdmin && (
+        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95">
+             <h3 className="text-2xl font-black text-primary mb-6">Nuevo Administrador</h3>
+             <div className="space-y-4">
+               <input placeholder="Usuario" className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingAdmin.username} onChange={e => setEditingAdmin({...editingAdmin, username: e.target.value})} />
+               <input placeholder="Contraseña" type="text" className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingAdmin.password} onChange={e => setEditingAdmin({...editingAdmin, password: e.target.value})} />
+               <select className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingAdmin.dept_slug} onChange={e => setEditingAdmin({...editingAdmin, dept_slug: e.target.value})}>
+                 {departments.map(d => <option key={d.id} value={d.slug}>{d.nombre}</option>)}
+               </select>
+               <div className="flex gap-3">
+                 <button onClick={() => setEditingAdmin(null)} className="flex-1 py-4 font-black">Cancelar</button>
+                 <button onClick={handleSaveAdmin} className="flex-1 bg-primary text-white rounded-2xl font-black">Crear</button>
+               </div>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pestañas de Config y Deptos (Super Admin Only) */}
+      {isSuper && activeTab === 'config' && (
+        <div className="glassmorphism p-8 rounded-[2.5rem] space-y-6 shadow-sm border border-white">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <ImageUploader label="Logo" currentUrl={localConfig.logo_url} onUpload={(url) => setLocalConfig({...localConfig, logo_url: url})} />
+              <input className="w-full bg-white p-4 rounded-xl border border-primary/5 font-bold" value={localConfig.slogan} onChange={e => setLocalConfig({...localConfig, slogan: e.target.value})} placeholder="Slogan" />
+            </div>
+            <div className="space-y-4">
+              <input className="w-full bg-white p-4 rounded-xl border border-primary/5 font-bold" value={localConfig.cintillo_promocional} onChange={e => setLocalConfig({...localConfig, cintillo_promocional: e.target.value})} placeholder="Cintillo" />
+              <input type="number" className="w-full bg-white p-4 rounded-xl border border-primary/5 font-black text-accent" value={localConfig.tasa_cambio} onChange={e => setLocalConfig({...localConfig, tasa_cambio: parseFloat(e.target.value)})} placeholder="Tasa" />
+            </div>
+          </div>
+          <button onClick={handleSaveConfig} disabled={saving} className="flex items-center gap-2 bg-primary text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-primary/20">
+            {saving ? <Loader2 className="animate-spin" /> : <Save size={18} />} Guardar Configuración
+          </button>
+        </div>
+      )}
+
+      {/* Editor de Producto Global */}
+      {editingProduct && (
+        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+             <div className="flex justify-between items-center mb-8">
+               <h3 className="text-3xl font-black text-primary">Editor de Producto</h3>
+               <button onClick={() => setEditingProduct(null)} className="p-2 hover:bg-offwhite rounded-full transition-colors"><X /></button>
+             </div>
+             <div className="space-y-6">
+               <ImageUploader label="Imagen del Producto" currentUrl={editingProduct.imagen_url || ''} onUpload={(url) => setEditingProduct({...editingProduct, imagen_url: url})} />
+               <input placeholder="Nombre" className="w-full bg-offwhite p-4 rounded-2xl font-bold" value={editingProduct.nombre} onChange={e => setEditingProduct({...editingProduct, nombre: e.target.value})} />
+               <textarea placeholder="Descripción" className="w-full bg-offwhite p-4 rounded-2xl font-bold h-24" value={editingProduct.descripcion} onChange={e => setEditingProduct({...editingProduct, descripcion: e.target.value})} />
+               <div className="grid grid-cols-2 gap-4">
+                 <input placeholder="Precio" type="number" step="0.01" className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingProduct.precio} onChange={e => setEditingProduct({...editingProduct, precio: parseFloat(e.target.value)})} />
+                 <select className="w-full bg-offwhite p-4 rounded-xl font-bold" disabled={!isSuper} value={editingProduct.departamento} onChange={e => setEditingProduct({...editingProduct, departamento: e.target.value as any})}>
+                   {departments.map(d => <option key={d.id} value={d.slug}>{d.nombre}</option>)}
+                 </select>
+               </div>
+               <select className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingProduct.unidad} onChange={e => setEditingProduct({...editingProduct, unidad: e.target.value as any})}>
+                 {UNIDADES.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+               </select>
+               <button onClick={handleSaveProduct} disabled={saving} className="w-full bg-primary text-white py-5 rounded-2xl font-black shadow-xl">
+                 {saving ? <Loader2 className="animate-spin mx-auto" /> : "Guardar Producto"}
+               </button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Editor de Depto (Super Admin Only) */}
+      {isSuper && activeTab === 'depts' && (
+        <div className="space-y-6">
+           <button onClick={() => setEditingDept({ nombre: '', slug: '', telefono_whatsapp: '', color_hex: '#3d4a3e' })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Depto</button>
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+             {departments.map(d => (
+               <div key={d.id} className="glassmorphism p-6 rounded-[2rem] border-t-8 border-white shadow-sm" style={{ borderTopColor: d.color_hex }}>
+                 <div className="flex justify-between items-start mb-4">
+                   <h3 className="font-black text-lg">{d.nombre}</h3>
+                   <div className="flex gap-2">
+                     <button onClick={() => setEditingDept(d)} className="p-2 bg-white rounded-lg shadow-sm"><Edit3 size={14} /></button>
+                     <button onClick={async () => { if(confirm("¿Eliminar?")){ await db.deleteDepartment(d.id); onRefresh(); } }} className="p-2 bg-white text-red-400 rounded-lg shadow-sm"><Trash2 size={14} /></button>
+                   </div>
+                 </div>
+                 <p className="text-[10px] font-black text-primary/30 uppercase">+{d.telefono_whatsapp}</p>
+               </div>
+             ))}
+           </div>
+        </div>
+      )}
+
+      {editingDept && (
+        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="bg-white w-full max-md rounded-[3rem] p-10 shadow-2xl animate-in slide-in-from-bottom-10">
+             <div className="flex justify-between items-center mb-6">
+               <h3 className="text-2xl font-black text-primary">Depto</h3>
+               <button onClick={() => setEditingDept(null)}><X /></button>
+             </div>
+             <div className="space-y-4">
+               <input placeholder="Nombre" className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingDept.nombre} onChange={e => setEditingDept({...editingDept, nombre: e.target.value})} />
+               <input placeholder="Slug" className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingDept.slug} onChange={e => setEditingDept({...editingDept, slug: e.target.value?.toLowerCase().replace(/\s+/g, '-') as any})} />
+               <input placeholder="WhatsApp" className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingDept.telefono_whatsapp} onChange={e => setEditingDept({...editingDept, telefono_whatsapp: e.target.value})} />
+               <input type="color" className="w-full h-12 rounded-lg cursor-pointer bg-transparent border-none" value={editingDept.color_hex} onChange={e => setEditingDept({...editingDept, color_hex: e.target.value})} />
+               <button onClick={async () => { await db.upsertDepartment(editingDept); setEditingDept(null); onRefresh(); }} className="w-full bg-primary text-white py-4 rounded-2xl font-black shadow-lg">Guardar</button>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -141,11 +441,11 @@ const HomeView: React.FC<{
           <div key={p.id} className="glassmorphism rounded-[2rem] overflow-hidden group hover:-translate-y-1 transition-all duration-300 shadow-sm border border-white">
             <div className="aspect-square relative overflow-hidden bg-white">
               <img src={p.imagen_url} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
-              <div className="absolute top-3 right-3"><Badge variant="primary">{p.unidad.toUpperCase()}</Badge></div>
+              <div className="absolute top-3 right-3"><Badge variant="primary">{p.unidad}</Badge></div>
             </div>
             <div className="p-5">
               <h3 className="font-bold text-lg mb-1">{p.nombre}</h3>
-              <p className="text-xs text-primary/50 mb-4 line-clamp-1">{p.descripcion}</p>
+              <p className="text-xs text-primary/50 mb-4 line-clamp-2 min-h-[2.5rem]">{p.descripcion || 'Sin descripción disponible.'}</p>
               <div className="flex justify-between items-center">
                 <div>
                   <div className="text-xl font-black text-primary">${p.precio.toFixed(2)}</div>
@@ -168,199 +468,6 @@ const HomeView: React.FC<{
   );
 };
 
-const AdminPanel: React.FC<{
-  products: Product[];
-  departments: Department[];
-  config: Config;
-  onRefresh: () => void;
-  onLogout: () => void;
-}> = ({ products, departments, config, onRefresh, onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'ventas' | 'productos' | 'depts' | 'config'>('ventas');
-  const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
-  const [editingDept, setEditingDept] = useState<Partial<Department> | null>(null);
-  const [localConfig, setLocalConfig] = useState<Config>(config);
-  const [saving, setSaving] = useState(false);
-  const [orders, setOrders] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (activeTab === 'ventas') {
-      db.getOrders().then(setOrders).catch(console.error);
-    }
-  }, [activeTab]);
-
-  const handleSaveProduct = async () => {
-    setSaving(true);
-    try {
-      await db.upsertProduct(editingProduct);
-      setEditingProduct(null);
-      onRefresh();
-    } catch (e) { alert("Error al guardar producto."); }
-    finally { setSaving(false); }
-  };
-
-  const handleSaveConfig = async () => {
-    setSaving(true);
-    try {
-      await db.updateConfig(localConfig);
-      onRefresh();
-      alert("Configuración actualizada.");
-    } catch (e) { alert("Error al guardar config."); }
-    finally { setSaving(false); }
-  };
-
-  return (
-    <div className="px-6 py-10 max-w-6xl mx-auto pb-32 animate-fade-in">
-      <header className="flex justify-between items-center mb-10">
-        <div>
-          <h2 className="text-3xl font-black">Super Administrador</h2>
-          <Badge variant="success">CLOUD SYNC</Badge>
-        </div>
-        <div className="flex gap-2">
-           <button onClick={onRefresh} className="p-3 bg-white border border-primary/5 text-primary rounded-xl hover:bg-accent hover:text-white transition-all"><RefreshCcw size={20} /></button>
-           <button onClick={onLogout} className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><LogOut size={20} /></button>
-        </div>
-      </header>
-
-      <div className="flex gap-4 mb-8 overflow-x-auto hide-scrollbar">
-        {['ventas', 'productos', 'depts', 'config'].map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-6 py-3 rounded-2xl font-bold text-sm capitalize transition-all ${activeTab === tab ? 'bg-primary text-white shadow-lg' : 'bg-white border border-primary/5 text-primary/40'}`}>
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'ventas' && (
-        <div className="space-y-4">
-          <h3 className="text-xl font-black mb-4">Registro de Ventas</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {orders.map(o => (
-              <div key={o.id} className="glassmorphism p-5 rounded-[2rem] shadow-sm border border-white">
-                <div className="flex justify-between items-start mb-3">
-                  <span className="text-[10px] font-black text-primary/20 uppercase">#{o.order_id}</span>
-                  <Badge variant="success">${o.total.toFixed(2)}</Badge>
-                </div>
-                <h4 className="font-bold text-lg">{o.nombre_cliente}</h4>
-                <p className="text-xs text-primary/50 line-clamp-2 mb-3">{o.direccion}</p>
-                <div className="flex justify-between items-center text-[10px] font-black uppercase text-primary/30">
-                  <span>{new Date(o.fecha_pedido).toLocaleDateString()}</span>
-                  <span className="text-accent">{o.metodo_entrega}</span>
-                </div>
-              </div>
-            ))}
-            {orders.length === 0 && <p className="text-primary/20 font-black py-10">No hay ventas registradas.</p>}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'config' && (
-        <div className="glassmorphism p-8 rounded-[2.5rem] space-y-6 shadow-sm border border-white">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-4">
-              <ImageUploader label="Logo" currentUrl={localConfig.logo_url} onUpload={(url) => setLocalConfig({...localConfig, logo_url: url})} />
-              <input className="w-full bg-white p-4 rounded-xl border border-primary/5 font-bold" value={localConfig.slogan} onChange={e => setLocalConfig({...localConfig, slogan: e.target.value})} placeholder="Slogan" />
-            </div>
-            <div className="space-y-4">
-              <input className="w-full bg-white p-4 rounded-xl border border-primary/5 font-bold" value={localConfig.cintillo_promocional} onChange={e => setLocalConfig({...localConfig, cintillo_promocional: e.target.value})} placeholder="Cintillo" />
-              <input type="number" className="w-full bg-white p-4 rounded-xl border border-primary/5 font-black text-accent" value={localConfig.tasa_cambio} onChange={e => setLocalConfig({...localConfig, tasa_cambio: parseFloat(e.target.value)})} placeholder="Tasa" />
-            </div>
-          </div>
-          <button onClick={handleSaveConfig} disabled={saving} className="flex items-center gap-2 bg-primary text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-primary/20">
-            {saving ? <Loader2 className="animate-spin" /> : <Save size={18} />} Guardar Configuración
-          </button>
-        </div>
-      )}
-
-      {activeTab === 'productos' && (
-        <div className="space-y-6">
-          <button onClick={() => setEditingProduct({ nombre: '', precio: 0, stock: 0, departamento: 'carnes' as any, unidad: 'kg', disponible: true })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Producto</button>
-          <div className="glassmorphism rounded-[2.5rem] overflow-hidden shadow-sm border border-white">
-            <table className="w-full text-left">
-              <thead className="bg-primary/5 text-[10px] uppercase font-black text-primary/30"><tr className="p-4"><th></th><th className="p-4">Producto</th><th>Depto</th><th>Precio</th><th className="p-4 text-center">Acciones</th></tr></thead>
-              <tbody className="divide-y divide-primary/5">
-                {products.map(p => (
-                  <tr key={p.id} className="text-sm font-medium hover:bg-white/40">
-                    <td className="p-4"><img src={p.imagen_url} className="w-10 h-10 rounded-lg object-cover bg-white" /></td>
-                    <td className="font-black">{p.nombre}</td>
-                    <td><Badge>{p.departamento.toUpperCase()}</Badge></td>
-                    <td className="font-bold">${p.precio}</td>
-                    <td className="p-4 flex justify-center gap-2">
-                      <button onClick={() => setEditingProduct(p)} className="p-2 text-accent bg-white rounded-lg shadow-sm"><Edit3 size={16} /></button>
-                      <button onClick={async () => { if(confirm("¿Eliminar?")){ await db.deleteProduct(p.id); onRefresh(); } }} className="p-2 text-red-400 bg-white rounded-lg shadow-sm"><Trash2 size={16} /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'depts' && (
-        <div className="space-y-6">
-           <button onClick={() => setEditingDept({ nombre: '', slug: 'carnes' as any, telefono_whatsapp: '', color_hex: '#3d4a3e' })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Depto</button>
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-             {departments.map(d => (
-               <div key={d.id} className="glassmorphism p-6 rounded-[2rem] border-t-8 border-white shadow-sm" style={{ borderTopColor: d.color_hex }}>
-                 <div className="flex justify-between items-start mb-4">
-                   <h3 className="font-black text-lg">{d.nombre}</h3>
-                   <div className="flex gap-2">
-                     <button onClick={() => setEditingDept(d)} className="p-2 bg-white rounded-lg shadow-sm"><Edit3 size={14} /></button>
-                     <button onClick={async () => { if(confirm("¿Eliminar?")){ await db.deleteDepartment(d.id); onRefresh(); } }} className="p-2 bg-white text-red-400 rounded-lg shadow-sm"><Trash2 size={14} /></button>
-                   </div>
-                 </div>
-                 <p className="text-[10px] font-black text-primary/30 uppercase">+{d.telefono_whatsapp}</p>
-               </div>
-             ))}
-           </div>
-        </div>
-      )}
-      
-      {editingProduct && (
-        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-             <div className="flex justify-between items-center mb-8">
-               <h3 className="text-3xl font-black">Editor de Producto</h3>
-               <button onClick={() => setEditingProduct(null)}><X /></button>
-             </div>
-             <div className="space-y-6">
-               <ImageUploader label="Imagen" currentUrl={editingProduct.imagen_url || ''} onUpload={(url) => setEditingProduct({...editingProduct, imagen_url: url})} />
-               <input placeholder="Nombre" className="w-full bg-offwhite p-4 rounded-2xl border border-primary/5 font-bold" value={editingProduct.nombre} onChange={e => setEditingProduct({...editingProduct, nombre: e.target.value})} />
-               <div className="grid grid-cols-2 gap-4">
-                 <input placeholder="Precio" type="number" className="bg-offwhite p-4 rounded-2xl border border-primary/5 font-bold" value={editingProduct.precio} onChange={e => setEditingProduct({...editingProduct, precio: parseFloat(e.target.value)})} />
-                 <input placeholder="Stock" type="number" className="bg-offwhite p-4 rounded-2xl border border-primary/5 font-bold" value={editingProduct.stock} onChange={e => setEditingProduct({...editingProduct, stock: parseInt(e.target.value)})} />
-               </div>
-               <select className="w-full bg-offwhite p-4 rounded-2xl border border-primary/5 font-bold" value={editingProduct.departamento} onChange={e => setEditingProduct({...editingProduct, departamento: e.target.value as any})}>
-                 {departments.map(d => <option key={d.id} value={d.slug}>{d.nombre}</option>)}
-               </select>
-               <button onClick={handleSaveProduct} disabled={saving} className="w-full bg-primary text-white py-5 rounded-2xl font-black shadow-xl">
-                 {saving ? <Loader2 className="animate-spin mx-auto" /> : "Guardar Producto"}
-               </button>
-             </div>
-          </div>
-        </div>
-      )}
-
-      {editingDept && (
-        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 shadow-2xl animate-in slide-in-from-bottom-10">
-             <div className="flex justify-between items-center mb-6">
-               <h3 className="text-2xl font-black">Departamento</h3>
-               <button onClick={() => setEditingDept(null)}><X /></button>
-             </div>
-             <div className="space-y-4">
-               <input placeholder="Nombre" className="w-full bg-offwhite p-4 rounded-2xl font-bold" value={editingDept.nombre} onChange={e => setEditingDept({...editingDept, nombre: e.target.value})} />
-               <input placeholder="Slug" className="w-full bg-offwhite p-4 rounded-2xl font-bold" value={editingDept.slug} onChange={e => setEditingDept({...editingDept, slug: e.target.value?.toLowerCase().replace(/\s+/g, '-') as any})} />
-               <input placeholder="WhatsApp" className="w-full bg-offwhite p-4 rounded-2xl font-bold" value={editingDept.telefono_whatsapp} onChange={e => setEditingDept({...editingDept, telefono_whatsapp: e.target.value})} />
-               <input type="color" className="w-full h-12 rounded-lg cursor-pointer bg-transparent border-none" value={editingDept.color_hex} onChange={e => setEditingDept({...editingDept, color_hex: e.target.value})} />
-               <button onClick={async () => { await db.upsertDepartment(editingDept); setEditingDept(null); onRefresh(); }} className="w-full bg-primary text-white py-4 rounded-2xl font-black shadow-lg">Guardar</button>
-             </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
 const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -369,32 +476,21 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [view, setView] = useState<'home' | 'cart' | 'checkout' | 'success' | 'admin' | 'login'>('home');
-  const [isAuth, setIsAuth] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
 
   const refreshData = async () => {
     setLoading(true);
-    setError(null);
     try {
-      const pResult = await db.getProducts().catch(e => {
-        console.warn("Tabla 'products' no disponible.");
-        return [];
-      });
-      const dResult = await db.getDepartments().catch(e => {
-        console.warn("Tabla 'departments' no disponible.");
-        return [];
-      });
-      const cResult = await db.getConfig().catch(e => null);
-
+      const pResult = await db.getProducts();
+      const dResult = await db.getDepartments();
+      const cResult = await db.getConfig();
       setProducts(pResult);
       setDepartments(dResult);
       if (cResult) setConfig(cResult);
     } catch (e: any) { 
-      console.error("Init Error:", e);
-      setError(e.message || "Error al conectar con la base de datos.");
-    } finally { 
-      setLoading(false); 
-    }
+      setError(e.message || "Error de base de datos");
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { refreshData(); }, []);
@@ -436,67 +532,48 @@ const App: React.FC = () => {
       const deptInfo = departments.find(d => d.slug === order.departamento);
       const text = `*PEDIDO JX4 PARACOTOS*\nID: ${order.order_id}\nCliente: ${order.nombre_cliente}\nTotal: $${order.total.toFixed(2)}`;
       window.open(`https://wa.me/${deptInfo?.telefono_whatsapp || config.whatsapp_general}?text=${encodeURIComponent(text)}`, '_blank');
-    } catch (e) { alert("Error al guardar pedido."); }
+    } catch (e: any) { alert("Error: " + e.message); }
   };
 
   const totalCart = cart.reduce((acc, i) => acc + i.quantity, 0);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-offwhite">
-        <Loader2 className="animate-spin text-primary" size={64} />
-        <h2 className="text-2xl font-black text-primary animate-pulse">Cargando JX4...</h2>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-red-50 p-6 text-center">
-        <WifiOff className="text-red-400" size={80} />
-        <h2 className="text-3xl font-black text-red-600">Error de Conexión</h2>
-        <p className="max-w-md text-red-500">{error}</p>
-        <button onClick={refreshData} className="bg-red-600 text-white px-8 py-3 rounded-2xl font-black flex items-center gap-2">
-          <RefreshCcw size={20} /> Reintentar
-        </button>
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-offwhite"><Loader2 className="animate-spin text-primary" size={64} /></div>;
 
   return (
     <HashRouter>
-      <div className="min-h-screen bg-offwhite selection:bg-accent selection:text-white pb-32">
+      <div className="min-h-screen bg-offwhite pb-32">
         <main className="max-w-7xl mx-auto">
           {view === 'home' && <HomeView products={products} departments={departments} onAddToCart={addToCart} config={config} />}
           
-          {view === 'admin' && isAuth && (
+          {view === 'admin' && currentUser && (
             <AdminPanel 
+              currentUser={currentUser}
               products={products} 
               departments={departments} 
               config={config} 
               onRefresh={refreshData} 
-              onLogout={() => { setIsAuth(false); setView('home'); }} 
+              onLogout={() => { setCurrentUser(null); setView('home'); }} 
             />
           )}
 
           {view === 'login' && (
             <div className="min-h-screen flex items-center justify-center p-6 animate-fade-in">
-               <form onSubmit={(e) => {
+               <form onSubmit={async (e) => {
                  e.preventDefault();
                  const fd = new FormData(e.currentTarget);
-                 if (fd.get('u')==='jjtovar1006' && fd.get('p')==='Apamate.25'){ 
-                   setIsAuth(true); 
-                   setView('admin'); 
-                 }
-                 else { alert("Credenciales incorrectas."); }
+                 try {
+                   const user = await db.login(fd.get('u') as string, fd.get('p') as string);
+                   setCurrentUser(user);
+                   setView('admin');
+                 } catch (e: any) { alert(e.message); }
                }} className="glassmorphism p-12 rounded-[3rem] w-full max-w-md space-y-8 shadow-2xl border border-white">
                  <div className="text-center">
                     <div className="bg-primary w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-white mb-6"><LogIn size={32} /></div>
-                    <h2 className="text-3xl font-black">Admin Access</h2>
+                    <h2 className="text-3xl font-black text-primary">Acceso Gestión</h2>
                  </div>
                  <div className="space-y-4">
-                    <input name="u" required placeholder="Usuario" className="w-full bg-white p-5 rounded-2xl font-bold border border-primary/5 outline-none" />
-                    <input name="p" type="password" required placeholder="Clave" className="w-full bg-white p-5 rounded-2xl font-bold border border-primary/5 outline-none" />
+                    <input name="u" required placeholder="Usuario" className="w-full bg-white p-5 rounded-2xl font-bold outline-none" />
+                    <input name="p" type="password" required placeholder="Clave" className="w-full bg-white p-5 rounded-2xl font-bold outline-none" />
                  </div>
                  <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all">Acceder</button>
                </form>
@@ -514,7 +591,7 @@ const App: React.FC = () => {
                        <div key={i.id} className="glassmorphism p-4 rounded-[2rem] flex items-center gap-4 shadow-sm border border-white">
                          <img src={i.imagen_url} className="w-20 h-20 rounded-2xl object-cover bg-white" />
                          <div className="flex-1">
-                           <h4 className="font-bold text-primary leading-tight">{i.nombre}</h4>
+                           <h4 className="font-bold text-primary">{i.nombre}</h4>
                            <p className="text-xs text-primary/40 font-bold">${i.precio.toFixed(2)}</p>
                          </div>
                          <div className="flex flex-col items-center gap-1 bg-offwhite p-1 rounded-xl">
@@ -522,10 +599,10 @@ const App: React.FC = () => {
                            <span className="font-black text-sm">{i.quantity}</span>
                            <button onClick={() => setCart(cart.map(x => x.id === i.id ? {...x, quantity: Math.max(1, x.quantity - 1)} : x))}><Minus size={14} /></button>
                          </div>
-                         <button onClick={() => setCart(cart.filter(x => x.id !== i.id))} className="text-red-300 hover:text-red-500 p-2"><Trash2 size={20} /></button>
+                         <button onClick={() => setCart(cart.filter(x => x.id !== i.id))} className="text-red-300 p-2"><Trash2 size={20} /></button>
                        </div>
                      ))}
-                     <div className="p-10 glassmorphism rounded-[2.5rem] mt-10 shadow-xl border border-white">
+                     <div className="p-10 glassmorphism rounded-[2.5rem] mt-10 shadow-xl border border-white text-center">
                         <div className="flex justify-between items-center font-black text-4xl mb-6 text-primary tracking-tighter"><span>Total:</span> <span>${cart.reduce((a,b) => a+(b.precio*b.quantity), 0).toFixed(2)}</span></div>
                         <button onClick={() => setView('checkout')} className="w-full bg-primary text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-2xl hover:bg-accent transition-all">Continuar <ArrowRight size={24} /></button>
                      </div>
@@ -536,7 +613,7 @@ const App: React.FC = () => {
 
           {view === 'checkout' && (
             <div className="px-6 py-20 max-w-xl mx-auto animate-fade-in">
-              <h2 className="text-3xl font-black mb-8 text-primary">Datos de Envío</h2>
+              <h2 className="text-3xl font-black mb-8 text-primary text-center">Datos de Envío</h2>
               <form onSubmit={(e) => {
                 e.preventDefault();
                 const fd = new FormData(e.currentTarget);
@@ -548,12 +625,12 @@ const App: React.FC = () => {
                 });
               }} className="space-y-6">
                 <div className="glassmorphism p-6 rounded-[2rem] space-y-4 border border-white">
-                  <input name="n" required placeholder="Nombre Completo" className="w-full bg-offwhite p-4 rounded-xl font-bold" />
-                  <input name="t" required type="tel" placeholder="WhatsApp (58424...)" className="w-full bg-offwhite p-4 rounded-xl font-bold" />
-                  <textarea name="d" required placeholder="Dirección exacta" className="w-full bg-offwhite p-4 rounded-xl font-bold h-24" />
+                  <input name="n" required placeholder="Nombre Completo" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" />
+                  <input name="t" required type="tel" placeholder="WhatsApp (58424...)" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" />
+                  <textarea name="d" required placeholder="Dirección exacta" className="w-full bg-offwhite p-4 rounded-xl font-bold h-24 outline-none" />
                 </div>
-                <div className="glassmorphism p-6 rounded-[2rem] border border-white">
-                  <h3 className="text-xs font-black uppercase text-primary/30 mb-4 tracking-widest">Entrega</h3>
+                <div className="glassmorphism p-6 rounded-[2rem] border border-white text-center">
+                  <h3 className="text-xs font-black uppercase text-primary/30 mb-4 tracking-widest">Método de Entrega</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer"><input type="radio" name="e" value="retiro" defaultChecked /><span className="font-bold">Retiro</span></label>
                     <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer"><input type="radio" name="e" value="delivery" /><span className="font-bold">Delivery</span></label>
@@ -567,20 +644,20 @@ const App: React.FC = () => {
           {view === 'success' && currentOrder && (
             <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-fade-in">
                <div className="w-32 h-32 bg-green-50 rounded-full flex items-center justify-center mb-10 border border-green-100"><CheckCircle2 size={80} className="text-green-500" /></div>
-               <h2 className="text-5xl font-black mb-6 tracking-tighter text-primary">¡Listo!</h2>
-               <p className="text-primary/50 mb-12 max-w-sm text-lg">Tu orden <strong>{currentOrder.order_id}</strong> se ha procesado exitosamente.</p>
+               <h2 className="text-5xl font-black mb-6 tracking-tighter text-primary">¡Pedido Enviado!</h2>
+               <p className="text-primary/50 mb-12 max-w-sm text-lg">Tu orden <strong>{currentOrder.order_id}</strong> se ha procesado exitosamente. Recibirás respuesta por WhatsApp.</p>
                <button onClick={() => setView('home')} className="bg-primary text-white px-16 py-5 rounded-2xl font-black text-xl shadow-2xl">Volver al Inicio</button>
             </div>
           )}
         </main>
 
         <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md glassmorphism rounded-full px-10 py-5 flex items-center justify-between shadow-2xl z-50 border border-white/40">
-          <button onClick={() => setView('home')} className={`p-2 transition-all ${view === 'home' ? 'text-accent scale-125' : 'text-primary/30'}`}><TrendingUp size={28} /></button>
+          <button onClick={() => setView('home')} className={`p-2 transition-all ${view === 'home' ? 'text-accent scale-125' : 'text-primary/30'}`}><Home size={28} /></button>
           <button onClick={() => setView('cart')} className={`p-2 relative transition-all ${view === 'cart' ? 'text-accent scale-125' : 'text-primary/30'}`}>
             <ShoppingBag size={28} />
             {totalCart > 0 && <span className="absolute -top-1 -right-1 bg-accent text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-lg">{totalCart}</span>}
           </button>
-          <button onClick={() => isAuth ? setView('admin') : setView('login')} className={`p-2 transition-all ${view === 'admin' || view === 'login' ? 'text-accent scale-125' : 'text-primary/30'}`}><LayoutDashboard size={28} /></button>
+          <button onClick={() => currentUser ? setView('admin') : setView('login')} className={`p-2 transition-all ${view === 'admin' || view === 'login' ? 'text-accent scale-125' : 'text-primary/30'}`}><Settings size={28} /></button>
         </nav>
       </div>
     </HashRouter>

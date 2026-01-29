@@ -40,13 +40,44 @@ export async function uploadImage(file: File, bucket: string = 'public-assets'):
 }
 
 export const db = {
-  getProducts: async () => {
-    const { data, error } = await supabase.from('products').select('*').order('nombre');
-    if (error) {
-      console.warn("Error en tabla 'products':", error.message);
-      throw error;
-    }
+  // Auth
+  login: async (username: string, password: string) => {
+    const { data, error } = await supabase
+      .from('admin_users')
+      .select('*')
+      .eq('username', username)
+      .eq('password', password)
+      .single();
+    if (error) throw new Error("Credenciales inválidas o usuario no encontrado");
+    return data;
+  },
+  
+  // Admins
+  getAdmins: async () => {
+    const { data, error } = await supabase.from('admin_users').select('*').order('username');
+    if (error) throw error;
     return data || [];
+  },
+  upsertAdmin: async (user: any) => {
+    const payload = { ...user };
+    if (!payload.id) delete payload.id;
+    const { data, error } = await supabase.from('admin_users').upsert(payload).select();
+    if (error) throw error;
+    return data;
+  },
+  deleteAdmin: async (id: string) => {
+    const { error } = await supabase.from('admin_users').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // Products
+  getProducts: async (deptSlug?: string) => {
+    let query = supabase.from('products').select('*').order('nombre');
+    if (deptSlug) query = query.eq('departamento', deptSlug);
+    const { data, error } = await supabase.from('products').select('*').order('nombre');
+    // Note: Local filtering for security in case deptSlug is provided but not forced by RLS
+    if (error) throw error;
+    return deptSlug ? (data || []).filter(p => p.departamento === deptSlug) : (data || []);
   },
   upsertProduct: async (product: any) => {
     const payload = { ...product };
@@ -59,12 +90,11 @@ export const db = {
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) throw error;
   },
+
+  // Departments
   getDepartments: async () => {
     const { data, error } = await supabase.from('departments').select('*').order('nombre');
-    if (error) {
-      console.warn("Error en tabla 'departments':", error.message);
-      throw error;
-    }
+    if (error) throw error;
     return data || [];
   },
   upsertDepartment: async (dept: any) => {
@@ -78,34 +108,29 @@ export const db = {
     const { error } = await supabase.from('departments').delete().eq('id', id);
     if (error) throw error;
   },
+
+  // Config
   getConfig: async () => {
-    try {
-      const { data, error } = await supabase.from('site_config').select('*').single();
-      if (error) {
-        if (error.code === 'PGRST205') console.error("La tabla 'site_config' NO existe en tu Supabase.");
-        if (error.code !== 'PGRST116') throw error;
-      }
-      return data;
-    } catch (e) {
-      return null;
-    }
+    const { data, error } = await supabase.from('site_config').select('*').single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
   },
   updateConfig: async (config: any) => {
     const { data, error } = await supabase.from('site_config').upsert({ id: 1, ...config }).select();
     if (error) throw error;
     return data;
   },
+
+  // Orders
   saveOrder: async (order: any) => {
     const { data, error } = await supabase.from('orders').insert(order).select();
-    if (error) {
-      if (error.code === 'PGRST205') alert("Error Crítico: La tabla 'orders' no existe en Supabase. Ejecuta el SQL de creación.");
-      throw error;
-    }
+    if (error) throw new Error(error.message);
     return data;
   },
-  getOrders: async () => {
-    const { data, error } = await supabase.from('orders').select('*').order('fecha_pedido', { ascending: false });
+  getOrders: async (deptSlug?: string) => {
+    let query = supabase.from('orders').select('*').order('fecha_pedido', { ascending: false });
+    const { data, error } = await query;
     if (error) throw error;
-    return data || [];
+    return deptSlug ? (data || []).filter(o => o.departamento === deptSlug) : (data || []);
   }
 };

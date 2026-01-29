@@ -1,5 +1,17 @@
 
-export type DepartmentSlug = 'carnes' | 'aves' | 'embutidos' | 'pescados';
+export type DepartmentSlug = 'carnes' | 'aves' | 'embutidos' | 'pescados' | string;
+
+export type UnidadMedida = 'und' | 'kg' | 'gr' | 'caja' | 'paquete' | 'bulto' | 'saco' | 'metro' | 'litro' | 'docena';
+
+export type UserRole = 'super' | 'dept_admin';
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  password?: string;
+  role: UserRole;
+  dept_slug?: DepartmentSlug;
+}
 
 export interface Product {
   id: string;
@@ -10,7 +22,7 @@ export interface Product {
   imagen_url: string;
   categoria: string;
   departamento: DepartmentSlug;
-  unidad: 'und' | 'kg';
+  unidad: UnidadMedida;
   peso_referencial: boolean;
   disponible: boolean;
   destacado: boolean;
