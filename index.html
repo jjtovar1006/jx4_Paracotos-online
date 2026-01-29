@@ -7,13 +7,18 @@
   <meta name="google" content="notranslate">
   <title>JX4 Paracotos v11.0</title>
   <script>
-    // Shim global para evitar errores de 'process is not defined' en módulos
-    window.process = {
-      env: {
-        NODE_ENV: 'production',
-        API_KEY: '' // Se inyectará externamente si es necesario
-      }
-    };
+    // Shim global robusto para entornos de navegador (Vercel/Static)
+    window.process = window.process || { env: { NODE_ENV: 'production' } };
+    if (!window.process.env) window.process.env = {};
+    
+    // Inyección de variables de entorno para que estén disponibles globalmente
+    // Vercel inyectará estas variables si están configuradas en el panel
+    window.process.env.API_KEY = window.process.env.API_KEY || '';
+    window.process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://lgdixakavpqlxgltzuei.supabase.co';
+    window.process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ';
+    
+    // Asegurar que 'process' sea accesible sin 'window.'
+    var process = window.process;
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,6 +31,7 @@
       color: #3d4a3e;
       margin: 0;
       padding: 0;
+      -webkit-font-smoothing: antialiased;
     }
     .glassmorphism {
       background: rgba(255, 255, 255, 0.8);
