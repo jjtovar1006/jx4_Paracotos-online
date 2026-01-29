@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 const getEnv = (key: string, fallback: string): string => {
   try {
     const win = window as any;
-    // Prioridad: Variable inyectada en window > process.env > fallback
     return win.process?.env?.[key] || process.env[key] || fallback;
   } catch (e) {
     return fallback;
@@ -14,7 +13,6 @@ const getEnv = (key: string, fallback: string): string => {
 const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://lgdixakavpqlxgltzuei.supabase.co');
 const supabaseAnonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ');
 
-// Crear cliente con manejo de error para evitar pantalla blanca
 let supabase: any;
 try {
   supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -70,13 +68,42 @@ export async function uploadImage(file: File, bucket: string = 'public-assets'):
 export const db = {
   login: async (username: string, password: string) => {
     if (!supabase) throw new Error("Error de conexión");
-    const { count, error: countError } = await supabase.from('admin_users').select('*', { count: 'exact', head: true });
-    if (countError) throw new Error(`Error de base de datos: ${countError.message}`);
-    if (count === 0) throw new Error("No hay administradores registrados.");
-    const { data, error } = await supabase.from('admin_users').select('*').eq('username', username).eq('password', password).maybeSingle();
-    if (error) throw error;
-    if (!data) throw new Error("Usuario o clave incorrectos.");
-    return data;
+
+    // 1. Llamar a la Edge Function para validar credenciales (Auth)
+    const { data: functionData, error: functionError } = await supabase.functions.invoke('login-by-username', {
+      body: { username, password }
+    });
+
+    if (functionError) {
+      // Manejar errores específicos de la función
+      if (functionError.message?.includes('401')) throw new Error("Credenciales inválidas.");
+      if (functionError.message?.includes('404')) throw new Error("Usuario no encontrado.");
+      throw new Error(`Error de autenticación: ${functionError.message}`);
+    }
+
+    if (!functionData || functionData.error) {
+       throw new Error(functionData?.error || "Error al iniciar sesión.");
+    }
+
+    // 2. Si la función fue exitosa, buscamos el perfil extendido en 'admin_users'
+    const { data: adminData, error: adminError } = await supabase
+      .from('admin_users')
+      .select('*')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (adminError) throw new Error(`Error al recuperar perfil: ${adminError.message}`);
+    if (!adminData) throw new Error("El usuario está autenticado pero no tiene perfil de administrador.");
+
+    // Establecer la sesión en el cliente (opcional, dependiendo de si quieres persistencia nativa)
+    if (functionData.access_token) {
+      await supabase.auth.setSession({
+        access_token: functionData.access_token,
+        refresh_token: functionData.refresh_token,
+      });
+    }
+
+    return adminData;
   },
   getAdmins: async () => {
     if (!supabase) return [];
