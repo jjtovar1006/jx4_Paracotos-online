@@ -8,7 +8,7 @@ import {
   Truck, Store, Bike, Car, HardHat, Save, X, Edit3, AlertCircle,
   Image as ImageIcon, Loader2, RefreshCcw, Clipboard, ExternalLink,
   WifiOff, Database, ShieldAlert, Terminal, FileText, Users, Lock, UserPlus,
-  Home
+  Home, MessageCircle
 } from 'lucide-react';
 
 import { Product, CartItem, DepartmentSlug, Order, Config, Department, UnidadMedida, AdminUser } from './types';
@@ -212,14 +212,26 @@ const AdminPanel: React.FC<{
       {activeTab === 'ventas' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {orders.map(o => (
-            <div key={o.id} className="glassmorphism p-5 rounded-[2rem] shadow-sm border border-white">
+            <div key={o.id} className="glassmorphism p-5 rounded-[2rem] shadow-sm border border-white flex flex-col">
               <div className="flex justify-between items-start mb-3">
                 <span className="text-[10px] font-black text-primary/20 uppercase">#{o.order_id}</span>
                 <Badge variant="success">${o.total.toFixed(2)}</Badge>
               </div>
               <h4 className="font-bold text-lg">{o.nombre_cliente}</h4>
-              <p className="text-xs text-primary/50 mb-3">{o.departamento.toUpperCase()}</p>
-              <div className="flex justify-between items-center text-[10px] font-black uppercase text-primary/30">
+              <p className="text-xs text-primary/50 mb-4">{o.departamento.toUpperCase()}</p>
+              
+              <button 
+                onClick={() => {
+                  const phone = o.telefono_cliente.replace(/\D/g, '');
+                  const text = encodeURIComponent(`Hola ${o.nombre_cliente}, te contacto de JX4 Paracotos sobre tu pedido #${o.order_id}.`);
+                  window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+                }}
+                className="w-full mb-4 py-3 bg-green-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-green-600 transition-colors shadow-lg shadow-green-200 active:scale-95"
+              >
+                <MessageCircle size={16} /> Contactar WhatsApp
+              </button>
+
+              <div className="mt-auto flex justify-between items-center text-[10px] font-black uppercase text-primary/30 border-t pt-3">
                 <span>{new Date(o.fecha_pedido).toLocaleDateString()}</span>
                 <span className="text-accent">{o.metodo_entrega}</span>
               </div>
@@ -612,7 +624,7 @@ const App: React.FC = () => {
           )}
 
           {view === 'checkout' && (
-            <div className="px-6 py-20 max-w-xl mx-auto animate-fade-in">
+            <div className="px-6 py-20 max-xl mx-auto animate-fade-in">
               <h2 className="text-3xl font-black mb-8 text-primary text-center">Datos de Envío</h2>
               <form onSubmit={(e) => {
                 e.preventDefault();
