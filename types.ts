@@ -56,6 +56,7 @@ export interface Order {
   departamento: DepartmentSlug;
   fecha_pedido: string;
   direccion: string;
+  notas?: string;
 }
 
 export interface Config {

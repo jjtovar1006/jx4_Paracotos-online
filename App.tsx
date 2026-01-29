@@ -145,7 +145,6 @@ const AdminPanel: React.FC<{
     setSaving(true);
     try {
       const payload = { ...editingProduct };
-      // Forzar depto si no es super
       if (!isSuper) payload.departamento = myDeptSlug;
       await db.upsertProduct(payload);
       setEditingProduct(null);
@@ -288,10 +287,9 @@ const AdminPanel: React.FC<{
         </div>
       )}
 
-      {/* Editor de Admin */}
       {editingAdmin && (
         <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95">
+          <div className="bg-white w-full max-md rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95">
              <h3 className="text-2xl font-black text-primary mb-6">Nuevo Administrador</h3>
              <div className="space-y-4">
                <input placeholder="Usuario" className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingAdmin.username} onChange={e => setEditingAdmin({...editingAdmin, username: e.target.value})} />
@@ -308,7 +306,6 @@ const AdminPanel: React.FC<{
         </div>
       )}
 
-      {/* Pestañas de Config y Deptos (Super Admin Only) */}
       {isSuper && activeTab === 'config' && (
         <div className="glassmorphism p-8 rounded-[2.5rem] space-y-6 shadow-sm border border-white">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -327,7 +324,6 @@ const AdminPanel: React.FC<{
         </div>
       )}
 
-      {/* Editor de Producto Global */}
       {editingProduct && (
         <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
@@ -356,7 +352,6 @@ const AdminPanel: React.FC<{
         </div>
       )}
 
-      {/* Editor de Depto (Super Admin Only) */}
       {isSuper && activeTab === 'depts' && (
         <div className="space-y-6">
            <button onClick={() => setEditingDept({ nombre: '', slug: '', telefono_whatsapp: '', color_hex: '#3d4a3e' })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Depto</button>
@@ -522,11 +517,12 @@ const App: React.FC = () => {
   const finalizeOrder = async (orderData: Partial<Order>) => {
     if (cart.length === 0) return;
     const totalUSD = cart.reduce((acc, i) => acc + (i.precio * i.quantity), 0);
-    const order: any = {
+    const order: Order = {
+      id: '', 
       order_id: `JX4-${Date.now()}`,
-      nombre_cliente: orderData.nombre_cliente,
-      telefono_cliente: orderData.telefono_cliente,
-      direccion: orderData.direccion,
+      nombre_cliente: orderData.nombre_cliente || '',
+      telefono_cliente: orderData.telefono_cliente || '',
+      direccion: orderData.direccion || '',
       productos: cart,
       total: totalUSD,
       total_bs: totalUSD * config.tasa_cambio,
@@ -534,15 +530,44 @@ const App: React.FC = () => {
       metodo_entrega: orderData.metodo_entrega || 'retiro',
       estado: 'pendiente',
       departamento: cart[0].departamento,
-      fecha_pedido: new Date().toISOString()
+      fecha_pedido: new Date().toISOString(),
+      notas: orderData.notas
     };
     try {
       await db.saveOrder(order);
       setCurrentOrder(order);
       setCart([]);
       setView('success');
+      
       const deptInfo = departments.find(d => d.slug === order.departamento);
-      const text = `*PEDIDO JX4 PARACOTOS*\nID: ${order.order_id}\nCliente: ${order.nombre_cliente}\nTotal: $${order.total.toFixed(2)}`;
+      
+      // Formatear el mensaje de WhatsApp según el requerimiento exacto
+      const productosTexto = order.productos
+        .map(p => `📦 *${p.nombre}* x${p.quantity}\n   _Subtotal: USD ${(p.precio * p.quantity).toFixed(2)}_`)
+        .join('\n\n');
+
+      const text = 
+`👤 *CLIENTE:*
+• Nombre: *${order.nombre_cliente.toUpperCase()}*
+• WhatsApp: ${order.telefono_cliente}
+• Método: ${order.metodo_entrega === 'retiro' ? '🏪 Retiro en Tienda' : '🚚 Delivery'}
+
+
+🛍️ *PRODUCTOS:*
+${productosTexto}
+
+---------------------------------------
+💵 *TOTAL USD:* *USD ${order.total.toFixed(2)}*
+
+💰 *Total VES:* Bs.S ${order.total_bs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+   _(Tasa: ${config.tasa_cambio})_
+
+
+📝 *NOTAS:* _${order.notas || 'Sin notas adicionales.'}_
+
+📍 *Paracotos, Edo. Miranda*
+_Generado desde Jx4 Catálogo_`;
+
       window.open(`https://wa.me/${deptInfo?.telefono_whatsapp || config.whatsapp_general}?text=${encodeURIComponent(text)}`, '_blank');
     } catch (e: any) { alert("Error: " + e.message); }
   };
@@ -624,7 +649,7 @@ const App: React.FC = () => {
           )}
 
           {view === 'checkout' && (
-            <div className="px-6 py-20 max-xl mx-auto animate-fade-in">
+            <div className="px-6 py-20 max-w-xl mx-auto animate-fade-in">
               <h2 className="text-3xl font-black mb-8 text-primary text-center">Datos de Envío</h2>
               <form onSubmit={(e) => {
                 e.preventDefault();
@@ -633,22 +658,30 @@ const App: React.FC = () => {
                   nombre_cliente: fd.get('n') as string,
                   telefono_cliente: fd.get('t') as string,
                   direccion: fd.get('d') as string,
-                  metodo_entrega: fd.get('e') as any
+                  metodo_entrega: fd.get('e') as any,
+                  notas: fd.get('notas') as string
                 });
               }} className="space-y-6">
                 <div className="glassmorphism p-6 rounded-[2rem] space-y-4 border border-white">
                   <input name="n" required placeholder="Nombre Completo" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" />
-                  <input name="t" required type="tel" placeholder="WhatsApp (58424...)" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" />
-                  <textarea name="d" required placeholder="Dirección exacta" className="w-full bg-offwhite p-4 rounded-xl font-bold h-24 outline-none" />
+                  <input name="t" required type="tel" placeholder="WhatsApp (Ej: 04123868364)" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" />
+                  <textarea name="d" required placeholder="Dirección exacta para la entrega" className="w-full bg-offwhite p-4 rounded-xl font-bold h-24 outline-none resize-none" />
+                  <textarea name="notas" placeholder="¿Alguna nota adicional? (Ej: Pago en destino, cambio de $20...)" className="w-full bg-offwhite p-4 rounded-xl font-bold h-20 outline-none resize-none" />
                 </div>
                 <div className="glassmorphism p-6 rounded-[2rem] border border-white text-center">
                   <h3 className="text-xs font-black uppercase text-primary/30 mb-4 tracking-widest">Método de Entrega</h3>
                   <div className="grid grid-cols-2 gap-4">
-                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer"><input type="radio" name="e" value="retiro" defaultChecked /><span className="font-bold">Retiro</span></label>
-                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer"><input type="radio" name="e" value="delivery" /><span className="font-bold">Delivery</span></label>
+                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer hover:bg-white transition-colors border border-transparent has-[:checked]:border-accent has-[:checked]:bg-white">
+                      <input type="radio" name="e" value="retiro" defaultChecked className="accent-accent" />
+                      <span className="font-bold">Retiro en Tienda</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer hover:bg-white transition-colors border border-transparent has-[:checked]:border-accent has-[:checked]:bg-white">
+                      <input type="radio" name="e" value="delivery" className="accent-accent" />
+                      <span className="font-bold">Delivery</span>
+                    </label>
                   </div>
                 </div>
-                <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl">Finalizar Pedido</button>
+                <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all active:scale-95">Finalizar Pedido</button>
               </form>
             </div>
           )}
