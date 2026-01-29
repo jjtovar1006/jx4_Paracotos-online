@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 
 const getEnv = (key: string, fallback: string): string => {
   try {
-    const val = (window as any).process?.env?.[key] || (typeof process !== 'undefined' ? process.env[key] : null);
-    return (val || fallback).trim(); // Trim para evitar espacios invisibles
+    const val = (window as any).process?.env?.[key] || (typeof process !== 'undefined' ? process.env?.[key] : null);
+    return (val || fallback).trim();
   } catch (e) {
     return fallback.trim();
   }
@@ -13,23 +13,18 @@ const getEnv = (key: string, fallback: string): string => {
 const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://lgdixakavpqlxgltzuei.supabase.co');
 const supabaseAnonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ');
 
-let supabase: any = null;
-try {
-  // Configuración explícita del cliente
-  supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true
-    }
-  });
-} catch (e) {
-  console.error("Critical: Failed to init Supabase client", e);
-}
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage
+  }
+});
 
 const isUuidString = (v: any) => {
   if (typeof v !== 'string') return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 };
 
 const cleanPayload = (payload: any): any => {
@@ -52,7 +47,6 @@ const cleanPayload = (payload: any): any => {
 };
 
 export async function uploadImage(file: File, bucket: string = 'public-assets'): Promise<string> {
-  if (!supabase) throw new Error("Base de datos no conectada");
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
   const filePath = `uploads/${fileName}`;
@@ -64,66 +58,69 @@ export async function uploadImage(file: File, bucket: string = 'public-assets'):
 
 export const db = {
   login: async (username: string, password: string) => {
-    if (!supabase) throw new Error("Error de conexión con el servidor.");
-
     try {
-      // Invocamos la función usando el método estándar del SDK
-      // body debe ser un objeto JSON plano
-      const { data, error: invokeError } = await supabase.functions.invoke('login-by-username', {
-        body: { username, password }
+      const functionUrl = `${supabaseUrl}/functions/v1/login-by-username`;
+      
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${supabaseAnonKey}`
+        },
+        body: JSON.stringify({ username, password })
+      }).catch(err => {
+        console.error("Fetch Error:", err);
+        throw new Error("ERROR DE CONEXIÓN: La función de Supabase no permite peticiones desde este dominio (CORS) o está caída.");
       });
 
-      if (invokeError) {
-        // El SDK a veces lanza "Failed to fetch" dentro de invokeError
-        console.error("Invoke error details:", invokeError);
-        if (invokeError.message?.includes('Failed to fetch')) {
-          throw new Error("No se pudo conectar con la Edge Function. Verifica que esté desplegada y acepte CORS.");
-        }
-        throw new Error(invokeError.message || "Error al invocar la función de autenticación.");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 404) throw new Error("La función de login no existe en Supabase.");
+        throw new Error(errorData.error || errorData.message || `Error ${response.status}: Credenciales inválidas.`);
       }
 
-      if (data?.error) {
-        throw new Error(data.error === 'Invalid credentials' ? "Usuario o clave incorrectos." : data.error);
+      const data = await response.json();
+
+      // Manejo de la respuesta de sesión de Supabase
+      const token = data.access_token || data.session?.access_token;
+      const refresh = data.refresh_token || data.session?.refresh_token;
+
+      if (!token) {
+        throw new Error("La función no devolvió un token de acceso. Revisa la configuración de la Edge Function.");
       }
 
-      // Establecemos la sesión para que el cliente Supabase esté autenticado
-      if (data?.access_token) {
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: data.access_token,
-          refresh_token: data.refresh_token
-        });
-        if (sessionError) console.error("Session set error:", sessionError);
-      }
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: token,
+        refresh_token: refresh || ''
+      });
 
-      // Recuperamos el perfil extendido de la tabla admin_users
-      const { data: profile, error: profileError } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('username', username)
-        .maybeSingle();
+      if (sessionError) throw new Error("Sesión fallida: " + sessionError.message);
 
-      if (profileError) {
-        throw new Error(`Sesión válida, pero error al cargar perfil: ${profileError.message}`);
-      }
-
-      if (!profile) {
-        await supabase.auth.signOut();
-        throw new Error("Este usuario no tiene permisos de administrador.");
-      }
-
-      return profile;
+      return await db.getAdminProfile(username);
 
     } catch (e: any) {
-      console.error("Login attempt failed:", e);
-      // Captura de errores de red puros
-      if (e.message?.includes('Failed to fetch') || e.name === 'TypeError') {
-        throw new Error("Error de red: No se pudo contactar con Supabase. Revisa tu conexión o el estado de las Edge Functions.");
-      }
+      console.error("Login Error:", e);
       throw e;
     }
   },
+
+  getAdminProfile: async (username: string) => {
+    const { data: profile, error: profileError } = await supabase
+      .from('admin_users')
+      .select('*')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (profileError) throw new Error(`Error de perfil: ${profileError.message}`);
+    if (!profile) {
+      await supabase.auth.signOut();
+      throw new Error("Usuario no encontrado en la tabla 'admin_users'.");
+    }
+    return profile;
+  },
+
   getAdmins: async () => {
-    if (!supabase) return [];
     const { data, error } = await supabase.from('admin_users').select('*').order('username');
     if (error) throw error;
     return data || [];
@@ -139,7 +136,6 @@ export const db = {
     if (error) throw error;
   },
   getProducts: async (deptSlug?: string) => {
-    if (!supabase) return [];
     let query = supabase.from('products').select('*').order('nombre');
     if (deptSlug) query = query.eq('departamento', deptSlug);
     const { data, error } = await query;
@@ -157,7 +153,6 @@ export const db = {
     if (error) throw error;
   },
   getDepartments: async () => {
-    if (!supabase) return [];
     const { data, error } = await supabase.from('departments').select('*').order('nombre');
     if (error) throw error;
     return data || [];
@@ -173,7 +168,6 @@ export const db = {
     if (error) throw error;
   },
   getConfig: async () => {
-    if (!supabase) return null;
     const { data, error } = await supabase.from('site_config').select('*').single();
     if (error && error.code !== 'PGRST116') throw error;
     return data;
@@ -190,7 +184,6 @@ export const db = {
     return data;
   },
   getOrders: async (deptSlugs?: string | string[]) => {
-    if (!supabase) return [];
     let query = supabase.from('orders').select('*').order('fecha_pedido', { ascending: false });
     if (deptSlugs) {
       if (Array.isArray(deptSlugs)) {
@@ -204,7 +197,6 @@ export const db = {
     return data || [];
   },
   getLatestOrderByPhone: async (phone: string) => {
-    if (!supabase) return null;
     const { data, error } = await supabase
       .from('orders')
       .select('nombre_cliente, direccion')
@@ -216,5 +208,3 @@ export const db = {
     return data;
   }
 };
-
-export { supabase };
