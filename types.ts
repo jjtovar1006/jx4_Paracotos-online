@@ -6,7 +6,7 @@ export type UnidadMedida = 'und' | 'kg' | 'gr' | 'caja' | 'paquete' | 'bulto' | 
 export type UserRole = 'super' | 'dept_admin';
 
 export interface AdminUser {
-  id: string;
+  id?: string;
   username: string;
   password?: string;
   role: UserRole;
@@ -14,7 +14,7 @@ export interface AdminUser {
 }
 
 export interface Product {
-  id: string;
+  id?: string;
   nombre: string;
   descripcion: string;
   precio: number;
@@ -33,7 +33,7 @@ export interface CartItem extends Product {
 }
 
 export interface Department {
-  id: string;
+  id?: string;
   nombre: string;
   slug: DepartmentSlug;
   telefono_whatsapp: string;
@@ -42,7 +42,7 @@ export interface Department {
 }
 
 export interface Order {
-  id: string;
+  id?: string;
   order_id: string;
   telefono_cliente: string;
   nombre_cliente: string;

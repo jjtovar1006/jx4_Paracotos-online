@@ -8,7 +8,7 @@ import {
   Truck, Store, Bike, Car, HardHat, Save, X, Edit3, AlertCircle,
   Image as ImageIcon, Loader2, RefreshCcw, Clipboard, ExternalLink,
   WifiOff, Database, ShieldAlert, Terminal, FileText, Users, Lock, UserPlus,
-  Home, MessageCircle
+  Home, MessageCircle, Sparkles
 } from 'lucide-react';
 
 import { Product, CartItem, DepartmentSlug, Order, Config, Department, UnidadMedida, AdminUser } from './types';
@@ -475,6 +475,128 @@ const HomeView: React.FC<{
   );
 };
 
+const CheckoutView: React.FC<{
+  onFinalize: (data: Partial<Order>) => void;
+}> = ({ onFinalize }) => {
+  const [formData, setFormData] = useState({
+    nombre: '',
+    telefono: '',
+    direccion: '',
+    entrega: 'retiro',
+    notas: ''
+  });
+  const [searching, setSearching] = useState(false);
+  const [found, setFound] = useState(false);
+
+  const handlePhoneChange = async (val: string) => {
+    setFormData(prev => ({ ...prev, telefono: val }));
+    // Si el número tiene longitud suficiente (ej: 10 u 11 dígitos), buscar
+    if (val.replace(/\D/g, '').length >= 10) {
+      setSearching(true);
+      try {
+        const lastOrder = await db.getLatestOrderByPhone(val);
+        if (lastOrder) {
+          setFormData(prev => ({
+            ...prev,
+            nombre: lastOrder.nombre_cliente,
+            direccion: lastOrder.direccion
+          }));
+          setFound(true);
+          // Ocultar el mensaje de éxito después de 3 seg
+          setTimeout(() => setFound(false), 3000);
+        }
+      } catch (e) {
+        console.error("Error buscando cliente:", e);
+      } finally {
+        setSearching(false);
+      }
+    }
+  };
+
+  return (
+    <div className="px-6 py-20 max-w-xl mx-auto animate-fade-in">
+      <h2 className="text-3xl font-black mb-8 text-primary text-center">Datos de Envío</h2>
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        onFinalize({
+          nombre_cliente: formData.nombre,
+          telefono_cliente: formData.telefono,
+          direccion: formData.direccion,
+          metodo_entrega: formData.entrega as any,
+          notas: formData.notas
+        });
+      }} className="space-y-6">
+        <div className="glassmorphism p-6 rounded-[2rem] space-y-4 border border-white relative">
+          
+          <div className="relative">
+            <input 
+              required 
+              type="tel" 
+              placeholder="WhatsApp (Ej: 04123868364)" 
+              className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" 
+              value={formData.telefono}
+              onChange={e => handlePhoneChange(e.target.value)}
+            />
+            {searching && <Loader2 className="absolute right-4 top-4 animate-spin text-accent" size={20} />}
+            {found && (
+              <div className="absolute -top-3 left-4 bg-accent text-white text-[9px] font-black px-2 py-1 rounded-full flex items-center gap-1 animate-bounce">
+                <Sparkles size={10} /> ¡BIENVENIDO DE NUEVO!
+              </div>
+            )}
+          </div>
+
+          <input 
+            required 
+            placeholder="Nombre Completo" 
+            className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" 
+            value={formData.nombre}
+            onChange={e => setFormData({...formData, nombre: e.target.value})}
+          />
+          
+          <textarea 
+            required 
+            placeholder="Dirección exacta para la entrega" 
+            className="w-full bg-offwhite p-4 rounded-xl font-bold h-24 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" 
+            value={formData.direccion}
+            onChange={e => setFormData({...formData, direccion: e.target.value})}
+          />
+          
+          <textarea 
+            placeholder="¿Alguna nota adicional? (Ej: Pago en destino, cambio de $20...)" 
+            className="w-full bg-offwhite p-4 rounded-xl font-bold h-20 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" 
+            value={formData.notas}
+            onChange={e => setFormData({...formData, notas: e.target.value})}
+          />
+        </div>
+
+        <div className="glassmorphism p-6 rounded-[2rem] border border-white text-center">
+          <h3 className="text-xs font-black uppercase text-primary/30 mb-4 tracking-widest">Método de Entrega</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <button 
+              type="button"
+              onClick={() => setFormData({...formData, entrega: 'retiro'})}
+              className={`flex items-center justify-center gap-2 p-4 rounded-xl font-bold transition-all border-2 ${formData.entrega === 'retiro' ? 'bg-white border-accent' : 'bg-offwhite border-transparent'}`}
+            >
+              Retiro en Tienda
+            </button>
+            <button 
+              type="button"
+              onClick={() => setFormData({...formData, entrega: 'delivery'})}
+              className={`flex items-center justify-center gap-2 p-4 rounded-xl font-bold transition-all border-2 ${formData.entrega === 'delivery' ? 'bg-white border-accent' : 'bg-offwhite border-transparent'}`}
+            >
+              Delivery
+            </button>
+          </div>
+        </div>
+        
+        <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all active:scale-95">
+          Finalizar Pedido
+        </button>
+      </form>
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -518,7 +640,6 @@ const App: React.FC = () => {
     if (cart.length === 0) return;
     const totalUSD = cart.reduce((acc, i) => acc + (i.precio * i.quantity), 0);
     const order: Order = {
-      id: '', 
       order_id: `JX4-${Date.now()}`,
       nombre_cliente: orderData.nombre_cliente || '',
       telefono_cliente: orderData.telefono_cliente || '',
@@ -541,7 +662,6 @@ const App: React.FC = () => {
       
       const deptInfo = departments.find(d => d.slug === order.departamento);
       
-      // Formatear el mensaje de WhatsApp según el requerimiento exacto
       const productosTexto = order.productos
         .map(p => `📦 *${p.nombre}* x${p.quantity}\n   _Subtotal: USD ${(p.precio * p.quantity).toFixed(2)}_`)
         .join('\n\n');
@@ -648,43 +768,7 @@ _Generado desde Jx4 Catálogo_`;
              </div>
           )}
 
-          {view === 'checkout' && (
-            <div className="px-6 py-20 max-w-xl mx-auto animate-fade-in">
-              <h2 className="text-3xl font-black mb-8 text-primary text-center">Datos de Envío</h2>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                finalizeOrder({
-                  nombre_cliente: fd.get('n') as string,
-                  telefono_cliente: fd.get('t') as string,
-                  direccion: fd.get('d') as string,
-                  metodo_entrega: fd.get('e') as any,
-                  notas: fd.get('notas') as string
-                });
-              }} className="space-y-6">
-                <div className="glassmorphism p-6 rounded-[2rem] space-y-4 border border-white">
-                  <input name="n" required placeholder="Nombre Completo" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" />
-                  <input name="t" required type="tel" placeholder="WhatsApp (Ej: 04123868364)" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" />
-                  <textarea name="d" required placeholder="Dirección exacta para la entrega" className="w-full bg-offwhite p-4 rounded-xl font-bold h-24 outline-none resize-none" />
-                  <textarea name="notas" placeholder="¿Alguna nota adicional? (Ej: Pago en destino, cambio de $20...)" className="w-full bg-offwhite p-4 rounded-xl font-bold h-20 outline-none resize-none" />
-                </div>
-                <div className="glassmorphism p-6 rounded-[2rem] border border-white text-center">
-                  <h3 className="text-xs font-black uppercase text-primary/30 mb-4 tracking-widest">Método de Entrega</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer hover:bg-white transition-colors border border-transparent has-[:checked]:border-accent has-[:checked]:bg-white">
-                      <input type="radio" name="e" value="retiro" defaultChecked className="accent-accent" />
-                      <span className="font-bold">Retiro en Tienda</span>
-                    </label>
-                    <label className="flex items-center gap-2 p-4 bg-offwhite rounded-xl cursor-pointer hover:bg-white transition-colors border border-transparent has-[:checked]:border-accent has-[:checked]:bg-white">
-                      <input type="radio" name="e" value="delivery" className="accent-accent" />
-                      <span className="font-bold">Delivery</span>
-                    </label>
-                  </div>
-                </div>
-                <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all active:scale-95">Finalizar Pedido</button>
-              </form>
-            </div>
-          )}
+          {view === 'checkout' && <CheckoutView onFinalize={finalizeOrder} />}
 
           {view === 'success' && currentOrder && (
             <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-fade-in">

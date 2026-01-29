@@ -74,10 +74,9 @@ export const db = {
   getProducts: async (deptSlug?: string) => {
     let query = supabase.from('products').select('*').order('nombre');
     if (deptSlug) query = query.eq('departamento', deptSlug);
-    const { data, error } = await supabase.from('products').select('*').order('nombre');
-    // Note: Local filtering for security in case deptSlug is provided but not forced by RLS
+    const { data, error } = await query;
     if (error) throw error;
-    return deptSlug ? (data || []).filter(p => p.departamento === deptSlug) : (data || []);
+    return data || [];
   },
   upsertProduct: async (product: any) => {
     const payload = { ...product };
@@ -123,14 +122,28 @@ export const db = {
 
   // Orders
   saveOrder: async (order: any) => {
-    const { data, error } = await supabase.from('orders').insert(order).select();
+    const payload = { ...order };
+    if (!payload.id) delete payload.id;
+    const { data, error } = await supabase.from('orders').insert(payload).select();
     if (error) throw new Error(error.message);
     return data;
   },
   getOrders: async (deptSlug?: string) => {
     let query = supabase.from('orders').select('*').order('fecha_pedido', { ascending: false });
+    if (deptSlug) query = query.eq('departamento', deptSlug);
     const { data, error } = await query;
     if (error) throw error;
-    return deptSlug ? (data || []).filter(o => o.departamento === deptSlug) : (data || []);
+    return data || [];
+  },
+  getLatestOrderByPhone: async (phone: string) => {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('nombre_cliente, direccion')
+      .eq('telefono_cliente', phone)
+      .order('fecha_pedido', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) return null;
+    return data;
   }
 };
