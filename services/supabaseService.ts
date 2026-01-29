@@ -3,8 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const getEnv = (key: string, fallback: string): string => {
   try {
-    // Intento de acceso seguro a process.env
-    const val = (typeof process !== 'undefined' && process.env) ? process.env[key] : null;
+    const val = (window as any).process?.env?.[key] || (typeof process !== 'undefined' ? process.env[key] : null);
     return val || fallback;
   } catch (e) {
     return fallback;
@@ -16,11 +15,9 @@ const supabaseAnonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI
 
 let supabase: any = null;
 try {
-  if (supabaseUrl && supabaseAnonKey) {
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
-  }
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
 } catch (e) {
-  console.error("Error al inicializar cliente Supabase:", e);
+  console.error("Critical: Failed to init Supabase client", e);
 }
 
 const isUuidString = (v: any) => {
@@ -29,27 +26,17 @@ const isUuidString = (v: any) => {
 };
 
 const cleanPayload = (payload: any): any => {
-  if (payload === null || payload === undefined) return payload;
-  if (typeof payload !== 'object') {
-    if (typeof payload === 'string' && payload.trim() === '') return null;
-    return payload;
-  }
-  if (Array.isArray(payload)) {
-    return payload.map(cleanPayload).filter((item) => item !== undefined);
-  }
+  if (!payload || typeof payload !== 'object') return payload;
+  if (Array.isArray(payload)) return payload.map(cleanPayload);
   const out: any = {};
   for (const key of Object.keys(payload)) {
     const val = payload[key];
-    if (val && typeof val === 'object') {
-      out[key] = cleanPayload(val);
-      continue;
-    }
     if (typeof val === 'string' && val.trim() === '') {
       if (key === 'id' || key.endsWith('_id')) continue;
       out[key] = null;
       continue;
     }
-    if ((key === 'id' || key.endsWith('_id') || key.endsWith('Id')) && val != null) {
+    if ((key === 'id' || key.endsWith('_id')) && val != null) {
       if (typeof val === 'string' && !isUuidString(val)) continue;
     }
     out[key] = val;
@@ -58,11 +45,11 @@ const cleanPayload = (payload: any): any => {
 };
 
 export async function uploadImage(file: File, bucket: string = 'public-assets'): Promise<string> {
-  if (!supabase) throw new Error("Servidor no disponible momentáneamente.");
+  if (!supabase) throw new Error("Database not connected");
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
   const filePath = `uploads/${fileName}`;
-  const { data, error } = await supabase.storage.from(bucket).upload(filePath, file, { cacheControl: '3600', upsert: false });
+  const { error } = await supabase.storage.from(bucket).upload(filePath, file);
   if (error) throw error;
   const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(filePath);
   return publicUrl;
@@ -72,36 +59,47 @@ export const db = {
   login: async (username: string, password: string) => {
     if (!supabase) throw new Error("Error de conexión con el servidor.");
 
-    const { data: functionData, error: functionError } = await supabase.functions.invoke('login-by-username', {
+    // 1. Invocamos la Edge Function de Supabase
+    const { data: authResult, error: invokeError } = await supabase.functions.invoke('login-by-username', {
       body: { username, password }
     });
 
-    if (functionError) {
-      if (functionError.message?.includes('401')) throw new Error("Credenciales inválidas.");
-      throw new Error(`Error de autenticación: ${functionError.message}`);
+    if (invokeError) {
+      console.error("Function invoke error:", invokeError);
+      throw new Error(`Error de servidor: ${invokeError.message || 'No se pudo contactar con el servicio de autenticación'}`);
     }
 
-    if (!functionData || functionData.error) {
-       throw new Error(functionData?.error || "Error al iniciar sesión.");
+    if (authResult?.error) {
+      throw new Error(authResult.error === 'Invalid credentials' ? "Usuario o clave incorrectos." : authResult.error);
     }
 
-    const { data: adminData, error: adminError } = await supabase
+    // 2. Establecemos la sesión localmente para que las consultas siguientes tengan los headers correctos
+    if (authResult?.access_token) {
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: authResult.access_token,
+        refresh_token: authResult.refresh_token
+      });
+      if (sessionError) console.error("Session set error:", sessionError);
+    }
+
+    // 3. Recuperamos el perfil extendido de la tabla admin_users
+    const { data: profile, error: profileError } = await supabase
       .from('admin_users')
       .select('*')
       .eq('username', username)
       .maybeSingle();
 
-    if (adminError) throw new Error(`Error al recuperar perfil: ${adminError.message}`);
-    if (!adminData) throw new Error("Perfil de administrador no encontrado.");
-
-    if (functionData.access_token) {
-      await supabase.auth.setSession({
-        access_token: functionData.access_token,
-        refresh_token: functionData.refresh_token,
-      });
+    if (profileError) {
+      throw new Error(`Sesión iniciada, pero hubo un error al cargar el perfil: ${profileError.message}`);
     }
 
-    return adminData;
+    if (!profile) {
+      // El usuario está en auth.users pero no tiene registro en admin_users
+      await supabase.auth.signOut();
+      throw new Error("Este usuario no tiene permisos de administrador en el sistema.");
+    }
+
+    return profile;
   },
   getAdmins: async () => {
     if (!supabase) return [];
@@ -110,14 +108,12 @@ export const db = {
     return data || [];
   },
   upsertAdmin: async (user: any) => {
-    if (!supabase) return null;
     const payload = cleanPayload(user);
     const { data, error } = await supabase.from('admin_users').upsert(payload).select();
     if (error) throw error;
     return data;
   },
   deleteAdmin: async (id: string) => {
-    if (!supabase) return;
     const { error } = await supabase.from('admin_users').delete().eq('id', id);
     if (error) throw error;
   },
@@ -130,14 +126,12 @@ export const db = {
     return data || [];
   },
   upsertProduct: async (product: any) => {
-    if (!supabase) return null;
     const payload = cleanPayload(product);
     const { data, error } = await supabase.from('products').upsert(payload).select();
     if (error) throw error;
     return data;
   },
   deleteProduct: async (id: string) => {
-    if (!supabase) return;
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) throw error;
   },
@@ -148,14 +142,12 @@ export const db = {
     return data || [];
   },
   upsertDepartment: async (dept: any) => {
-    if (!supabase) return null;
     const payload = cleanPayload(dept);
     const { data, error } = await supabase.from('departments').upsert(payload).select();
     if (error) throw error;
     return data;
   },
   deleteDepartment: async (id: string) => {
-    if (!supabase) return;
     const { error } = await supabase.from('departments').delete().eq('id', id);
     if (error) throw error;
   },
@@ -166,13 +158,11 @@ export const db = {
     return data;
   },
   updateConfig: async (config: any) => {
-    if (!supabase) return null;
     const { data, error } = await supabase.from('site_config').upsert({ id: 1, ...config }).select();
     if (error) throw error;
     return data;
   },
   saveOrder: async (order: any) => {
-    if (!supabase) throw new Error("Servicio de pedidos no disponible.");
     const payload = cleanPayload(order);
     const { data, error } = await supabase.from('orders').insert(payload).select();
     if (error) throw new Error(error.message);

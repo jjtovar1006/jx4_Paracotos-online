@@ -7,28 +7,15 @@
   <meta name="google" content="notranslate">
   <title>JX4 Paracotos v11.0</title>
   <script>
-    // Shim global ultra-robusto para evitar pantallas blancas por ReferenceError: process is not defined
-    (function() {
-      var processShim = {
-        env: {
-          NODE_ENV: 'production',
-          API_KEY: '',
-          NEXT_PUBLIC_SUPABASE_URL: 'https://lgdixakavpqlxgltzuei.supabase.co',
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ'
-        }
-      };
-      
-      try {
-        Object.defineProperty(window, 'process', {
-          value: processShim,
-          enumerable: true,
-          configurable: true,
-          writable: true
-        });
-      } catch (e) {
-        window.process = processShim;
+    // Shim ultra-temprano para evitar ReferenceError en Vercel
+    window.process = {
+      env: {
+        NODE_ENV: 'production',
+        API_KEY: '',
+        NEXT_PUBLIC_SUPABASE_URL: 'https://lgdixakavpqlxgltzuei.supabase.co',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ'
       }
-    })();
+    };
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -49,44 +36,24 @@
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
-    .hide-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
-    .hide-scrollbar {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .animate-fade-in {
-      animation: fadeIn 0.5s ease-out forwards;
-    }
+    .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
   </style>
   <script>
     tailwind.config = {
       theme: {
         extend: {
           colors: {
-            primary: {
-              DEFAULT: '#3d4a3e',
-              light: '#5d6a5e',
-              dark: '#2d3a2e',
-            },
-            accent: {
-              DEFAULT: '#d4a574',
-              light: '#e4c5a4',
-              dark: '#c49564',
-            },
-            offwhite: {
-              DEFAULT: '#f8f9f8',
-              dark: '#e8e9e8',
-            }
+            primary: { DEFAULT: '#3d4a3e', light: '#5d6a5e', dark: '#2d3a2e' },
+            accent: { DEFAULT: '#d4a574', light: '#e4c5a4', dark: '#c49564' },
+            offwhite: { DEFAULT: '#f8f9f8', dark: '#e8e9e8' }
           },
-          borderRadius: {
-            'xxl': '2.5rem',
-          }
+          borderRadius: { 'xxl': '2.5rem' }
         }
       }
     }
