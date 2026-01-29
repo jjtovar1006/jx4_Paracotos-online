@@ -15,6 +15,62 @@ const supabaseAnonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+const isUuidString = (v: any) => {
+  if (typeof v !== 'string') return false;
+  // UUID v4/v1 general pattern (8-4-4-4-12 hex)
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+};
+
+const cleanPayload = (payload: any): any => {
+  if (payload === null || payload === undefined) return payload;
+
+  // Primitivos
+  if (typeof payload !== 'object') {
+    if (typeof payload === 'string' && payload.trim() === '') return null; // convert empty string to null
+    return payload;
+  }
+
+  // Arrays
+  if (Array.isArray(payload)) {
+    return payload
+      .map(cleanPayload)
+      .filter((item) => item !== undefined); // remove undefined entries
+  }
+
+  // Objetos
+  const out: any = {};
+  for (const key of Object.keys(payload)) {
+    const val = payload[key];
+
+    // Recurse primero para objetos/arrays
+    if (val && typeof val === 'object') {
+      const cleaned = cleanPayload(val);
+      out[key] = cleaned;
+      continue;
+    }
+
+    // Manejo para strings vacíos
+    if (typeof val === 'string' && val.trim() === '') {
+      if (key === 'id' || key.endsWith('_id')) {
+        continue;
+      }
+      out[key] = null;
+      continue;
+    }
+
+    // Manejo: si la key parece un uuid y el valor no es uuid válido, eliminarla
+    if ((key === 'id' || key.endsWith('_id') || key.endsWith('Id')) && val != null) {
+      if (typeof val === 'string' && !isUuidString(val)) {
+        continue;
+      }
+    }
+
+    out[key] = val;
+  }
+
+  return out;
+};
+
 export async function uploadImage(file: File, bucket: string = 'public-assets'): Promise<string> {
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -40,7 +96,6 @@ export async function uploadImage(file: File, bucket: string = 'public-assets'):
 }
 
 export const db = {
-  // Auth
   login: async (username: string, password: string) => {
     const { data, error } = await supabase
       .from('admin_users')
@@ -52,15 +107,13 @@ export const db = {
     return data;
   },
   
-  // Admins
   getAdmins: async () => {
     const { data, error } = await supabase.from('admin_users').select('*').order('username');
     if (error) throw error;
     return data || [];
   },
   upsertAdmin: async (user: any) => {
-    const payload = { ...user };
-    if (!payload.id) delete payload.id;
+    const payload = cleanPayload(user);
     const { data, error } = await supabase.from('admin_users').upsert(payload).select();
     if (error) throw error;
     return data;
@@ -70,7 +123,6 @@ export const db = {
     if (error) throw error;
   },
 
-  // Products
   getProducts: async (deptSlug?: string) => {
     let query = supabase.from('products').select('*').order('nombre');
     if (deptSlug) query = query.eq('departamento', deptSlug);
@@ -79,8 +131,7 @@ export const db = {
     return data || [];
   },
   upsertProduct: async (product: any) => {
-    const payload = { ...product };
-    if (!payload.id) delete payload.id;
+    const payload = cleanPayload(product);
     const { data, error } = await supabase.from('products').upsert(payload).select();
     if (error) throw error;
     return data;
@@ -90,15 +141,13 @@ export const db = {
     if (error) throw error;
   },
 
-  // Departments
   getDepartments: async () => {
     const { data, error } = await supabase.from('departments').select('*').order('nombre');
     if (error) throw error;
     return data || [];
   },
   upsertDepartment: async (dept: any) => {
-    const payload = { ...dept };
-    if (!payload.id) delete payload.id;
+    const payload = cleanPayload(dept);
     const { data, error } = await supabase.from('departments').upsert(payload).select();
     if (error) throw error;
     return data;
@@ -108,7 +157,6 @@ export const db = {
     if (error) throw error;
   },
 
-  // Config
   getConfig: async () => {
     const { data, error } = await supabase.from('site_config').select('*').single();
     if (error && error.code !== 'PGRST116') throw error;
@@ -120,17 +168,28 @@ export const db = {
     return data;
   },
 
-  // Orders
   saveOrder: async (order: any) => {
-    const payload = { ...order };
-    if (!payload.id) delete payload.id;
+    const payload = cleanPayload(order);
     const { data, error } = await supabase.from('orders').insert(payload).select();
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error("Supabase Insert Error:", error);
+      throw new Error(error.message);
+    }
     return data;
   },
-  getOrders: async (deptSlug?: string) => {
+  getOrders: async (deptSlugs?: string | string[]) => {
     let query = supabase.from('orders').select('*').order('fecha_pedido', { ascending: false });
-    if (deptSlug) query = query.eq('departamento', deptSlug);
+    
+    if (deptSlugs) {
+      if (Array.isArray(deptSlugs)) {
+        if (deptSlugs.length > 0) {
+          query = query.in('departamento', deptSlugs);
+        }
+      } else {
+        query = query.eq('departamento', deptSlugs);
+      }
+    }
+    
     const { data, error } = await query;
     if (error) throw error;
     return data || [];

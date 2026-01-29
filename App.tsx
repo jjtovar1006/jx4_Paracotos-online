@@ -3,12 +3,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { 
   ShoppingBag, Plus, Minus, Trash2, ArrowRight, CheckCircle2, 
-  LayoutDashboard, Search, ChevronRight, TrendingUp, Package, 
-  Settings, Upload, LogIn, LogOut,
-  Truck, Store, Bike, Car, HardHat, Save, X, Edit3, AlertCircle,
-  Image as ImageIcon, Loader2, RefreshCcw, Clipboard, ExternalLink,
-  WifiOff, Database, ShieldAlert, Terminal, FileText, Users, Lock, UserPlus,
-  Home, MessageCircle, Sparkles
+  Search, Package, Settings, Upload, LogIn, LogOut,
+  Save, X, Edit3, Loader2, RefreshCcw, 
+  ShieldAlert, Users, Lock, UserPlus, Home, MessageCircle, Sparkles
 } from 'lucide-react';
 
 import { Product, CartItem, DepartmentSlug, Order, Config, Department, UnidadMedida, AdminUser } from './types';
@@ -109,7 +106,7 @@ const AdminPanel: React.FC<{
   onLogout: () => void;
 }> = ({ currentUser, products, departments, config, onRefresh, onLogout }) => {
   const isSuper = currentUser.role === 'super';
-  const myDeptSlug = currentUser.dept_slug;
+  const myDeptSlugs = currentUser.dept_slugs || [];
 
   const [activeTab, setActiveTab] = useState<'ventas' | 'productos' | 'depts' | 'config' | 'users'>('ventas');
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -119,13 +116,12 @@ const AdminPanel: React.FC<{
   const [saving, setSaving] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
-  const [dbError, setDbError] = useState<string | null>(null);
 
   const fetchOrders = async () => {
     try {
-      const data = await db.getOrders(isSuper ? undefined : myDeptSlug);
+      const data = await db.getOrders(isSuper ? undefined : myDeptSlugs);
       setOrders(data);
-    } catch (e: any) { setDbError(e.message); }
+    } catch (e: any) { alert("Error al cargar pedidos: " + e.message); }
   };
 
   const fetchAdmins = async () => {
@@ -133,7 +129,7 @@ const AdminPanel: React.FC<{
     try {
       const data = await db.getAdmins();
       setAdmins(data);
-    } catch (e: any) { setDbError(e.message); }
+    } catch (e: any) { alert("Error al cargar usuarios: " + e.message); }
   };
 
   useEffect(() => {
@@ -145,7 +141,10 @@ const AdminPanel: React.FC<{
     setSaving(true);
     try {
       const payload = { ...editingProduct };
-      if (!isSuper) payload.departamento = myDeptSlug;
+      // Si no es super, y el producto no tiene depto o no pertenece a uno asignado, forzar el primero asignado
+      if (!isSuper && (!payload.departamento || !myDeptSlugs.includes(payload.departamento))) {
+        payload.departamento = myDeptSlugs[0];
+      }
       await db.upsertProduct(payload);
       setEditingProduct(null);
       onRefresh();
@@ -154,6 +153,10 @@ const AdminPanel: React.FC<{
   };
 
   const handleSaveAdmin = async () => {
+    if (!editingAdmin?.username) return alert("El usuario es obligatorio");
+    if (!editingAdmin?.dept_slugs || editingAdmin.dept_slugs.length === 0) {
+      if (editingAdmin.role !== 'super') return alert("Selecciona al menos un departamento");
+    }
     setSaving(true);
     try {
       await db.upsertAdmin(editingAdmin);
@@ -173,7 +176,7 @@ const AdminPanel: React.FC<{
     finally { setSaving(false); }
   };
 
-  const filteredProducts = isSuper ? products : products.filter(p => p.departamento === myDeptSlug);
+  const filteredProducts = isSuper ? products : products.filter(p => myDeptSlugs.includes(p.departamento));
 
   return (
     <div className="px-6 py-10 max-w-6xl mx-auto pb-32 animate-fade-in">
@@ -184,8 +187,11 @@ const AdminPanel: React.FC<{
            </div>
            <div>
             <h2 className="text-3xl font-black text-primary">Panel Administrativo</h2>
-            <div className="flex items-center gap-2">
-              <Badge variant={isSuper ? "warning" : "info"}>{isSuper ? "Super Usuario" : "Admin depto: " + myDeptSlug}</Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={isSuper ? "warning" : "info"}>{isSuper ? "Super Usuario" : "Admin de Deptos"}</Badge>
+              {!isSuper && myDeptSlugs.map(slug => (
+                <span key={slug} className="text-[9px] font-black text-accent uppercase bg-accent/10 px-2 py-0.5 rounded-md">{slug}</span>
+              ))}
               <span className="text-[10px] font-black text-primary/30 uppercase">@{currentUser.username}</span>
             </div>
            </div>
@@ -242,9 +248,9 @@ const AdminPanel: React.FC<{
 
       {activeTab === 'productos' && (
         <div className="space-y-6">
-          <button onClick={() => setEditingProduct({ nombre: '', descripcion: '', precio: 0, stock: 0, departamento: isSuper ? 'carnes' : myDeptSlug, unidad: 'kg', disponible: true })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Producto</button>
-          <div className="glassmorphism rounded-[2.5rem] overflow-hidden shadow-sm border border-white">
-            <table className="w-full text-left">
+          <button onClick={() => setEditingProduct({ nombre: '', descripcion: '', precio: 0, stock: 0, departamento: isSuper ? 'carnes' : myDeptSlugs[0], unidad: 'kg', disponible: true })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Plus size={18} /> Nuevo Producto</button>
+          <div className="glassmorphism rounded-[2.5rem] overflow-hidden shadow-sm border border-white overflow-x-auto">
+            <table className="w-full text-left min-w-[600px]">
               <thead className="bg-primary/5 text-[10px] uppercase font-black text-primary/30"><tr className="p-4"><th></th><th className="p-4">Producto</th><th>Depto</th><th>Precio</th><th className="p-4 text-center">Acciones</th></tr></thead>
               <tbody className="divide-y divide-primary/5">
                 {filteredProducts.map(p => (
@@ -267,7 +273,7 @@ const AdminPanel: React.FC<{
 
       {activeTab === 'users' && isSuper && (
         <div className="space-y-6">
-           <button onClick={() => setEditingAdmin({ username: '', password: '', role: 'dept_admin', dept_slug: departments[0]?.slug })} className="bg-accent text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><UserPlus size={18} /> Crear Administrador</button>
+           <button onClick={() => setEditingAdmin({ username: '', password: '', role: 'dept_admin', dept_slugs: [] })} className="bg-accent text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><UserPlus size={18} /> Crear Administrador</button>
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              {admins.map(admin => (
                <div key={admin.id} className="glassmorphism p-6 rounded-[2rem] flex items-center justify-between border border-white shadow-sm">
@@ -275,12 +281,18 @@ const AdminPanel: React.FC<{
                    <div className={`p-3 rounded-xl ${admin.role === 'super' ? 'bg-accent' : 'bg-primary/10 text-primary'}`}><Users size={20} /></div>
                    <div>
                      <p className="font-black text-primary">@{admin.username}</p>
-                     <p className="text-[10px] font-black uppercase text-primary/40">{admin.role === 'super' ? 'Súper' : 'Depto: ' + admin.dept_slug}</p>
+                     <div className="flex flex-wrap gap-1 mt-1">
+                       <span className="text-[10px] font-black uppercase text-primary/40 mr-2">{admin.role === 'super' ? 'Súper' : 'Admin'}</span>
+                       {admin.dept_slugs?.map(s => <span key={s} className="bg-primary/5 text-[8px] font-black px-1 rounded">{s}</span>)}
+                     </div>
                    </div>
                  </div>
-                 {admin.role !== 'super' && (
-                    <button onClick={async () => { if(confirm("¿Eliminar admin?")){ await db.deleteAdmin(admin.id); fetchAdmins(); } }} className="p-2 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={18} /></button>
-                 )}
+                 <div className="flex gap-2">
+                    <button onClick={() => setEditingAdmin(admin)} className="p-2 text-accent bg-white rounded-lg shadow-sm"><Edit3 size={16} /></button>
+                    {admin.role !== 'super' && (
+                      <button onClick={async () => { if(confirm("¿Eliminar admin?")){ await db.deleteAdmin(admin.id); fetchAdmins(); } }} className="p-2 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={18} /></button>
+                    )}
+                 </div>
                </div>
              ))}
            </div>
@@ -288,18 +300,57 @@ const AdminPanel: React.FC<{
       )}
 
       {editingAdmin && (
-        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="bg-white w-full max-md rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95">
-             <h3 className="text-2xl font-black text-primary mb-6">Nuevo Administrador</h3>
+        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6 overflow-y-auto">
+          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 my-auto">
+             <h3 className="text-2xl font-black text-primary mb-6">Gestionar Administrador</h3>
              <div className="space-y-4">
-               <input placeholder="Usuario" className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingAdmin.username} onChange={e => setEditingAdmin({...editingAdmin, username: e.target.value})} />
-               <input placeholder="Contraseña" type="text" className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingAdmin.password} onChange={e => setEditingAdmin({...editingAdmin, password: e.target.value})} />
-               <select className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingAdmin.dept_slug} onChange={e => setEditingAdmin({...editingAdmin, dept_slug: e.target.value})}>
-                 {departments.map(d => <option key={d.id} value={d.slug}>{d.nombre}</option>)}
-               </select>
-               <div className="flex gap-3">
-                 <button onClick={() => setEditingAdmin(null)} className="flex-1 py-4 font-black">Cancelar</button>
-                 <button onClick={handleSaveAdmin} className="flex-1 bg-primary text-white rounded-2xl font-black">Crear</button>
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Usuario</label>
+                 <input placeholder="Usuario" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingAdmin.username} onChange={e => setEditingAdmin({...editingAdmin, username: e.target.value})} />
+               </div>
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Contraseña {editingAdmin.id && "(dejar vacío para no cambiar)"}</label>
+                 <input placeholder="Contraseña" type="text" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingAdmin.password} onChange={e => setEditingAdmin({...editingAdmin, password: e.target.value})} />
+               </div>
+               
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Rol</label>
+                 <select className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingAdmin.role} onChange={e => setEditingAdmin({...editingAdmin, role: e.target.value as any})}>
+                   <option value="dept_admin">Administrador de Depto</option>
+                   <option value="super">Super Usuario</option>
+                 </select>
+               </div>
+
+               {editingAdmin.role !== 'super' && (
+                 <div className="space-y-2">
+                   <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Departamentos a cargo</label>
+                   <div className="grid grid-cols-2 gap-2 bg-offwhite p-4 rounded-xl">
+                     {departments.map(d => (
+                       <label key={d.id} className="flex items-center gap-2 cursor-pointer hover:bg-white p-1 rounded transition-colors">
+                         <input 
+                           type="checkbox" 
+                           checked={editingAdmin.dept_slugs?.includes(d.slug)} 
+                           onChange={(e) => {
+                             const currentSlugs = editingAdmin.dept_slugs || [];
+                             const newSlugs = e.target.checked 
+                               ? [...currentSlugs, d.slug]
+                               : currentSlugs.filter(s => s !== d.slug);
+                             setEditingAdmin({...editingAdmin, dept_slugs: newSlugs});
+                           }}
+                           className="accent-primary"
+                         />
+                         <span className="text-xs font-bold text-primary">{d.nombre}</span>
+                       </label>
+                     ))}
+                   </div>
+                 </div>
+               )}
+
+               <div className="flex gap-3 pt-4">
+                 <button onClick={() => setEditingAdmin(null)} className="flex-1 py-4 font-black text-primary/40 hover:text-primary transition-colors">Cancelar</button>
+                 <button onClick={handleSaveAdmin} disabled={saving} className="flex-1 bg-primary text-white rounded-2xl font-black shadow-lg flex items-center justify-center">
+                   {saving ? <Loader2 className="animate-spin" size={20} /> : (editingAdmin.id ? "Actualizar" : "Crear")}
+                 </button>
                </div>
              </div>
           </div>
@@ -311,41 +362,48 @@ const AdminPanel: React.FC<{
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-4">
               <ImageUploader label="Logo" currentUrl={localConfig.logo_url} onUpload={(url) => setLocalConfig({...localConfig, logo_url: url})} />
-              <input className="w-full bg-white p-4 rounded-xl border border-primary/5 font-bold" value={localConfig.slogan} onChange={e => setLocalConfig({...localConfig, slogan: e.target.value})} placeholder="Slogan" />
+              <input className="w-full bg-white p-4 rounded-xl border border-primary/5 font-bold outline-none" value={localConfig.slogan} onChange={e => setLocalConfig({...localConfig, slogan: e.target.value})} placeholder="Slogan" />
             </div>
             <div className="space-y-4">
-              <input className="w-full bg-white p-4 rounded-xl border border-primary/5 font-bold" value={localConfig.cintillo_promocional} onChange={e => setLocalConfig({...localConfig, cintillo_promocional: e.target.value})} placeholder="Cintillo" />
-              <input type="number" className="w-full bg-white p-4 rounded-xl border border-primary/5 font-black text-accent" value={localConfig.tasa_cambio} onChange={e => setLocalConfig({...localConfig, tasa_cambio: parseFloat(e.target.value)})} placeholder="Tasa" />
+              <input className="w-full bg-white p-4 rounded-xl border border-primary/5 font-bold outline-none" value={localConfig.cintillo_promocional} onChange={e => setLocalConfig({...localConfig, cintillo_promocional: e.target.value})} placeholder="Cintillo" />
+              <input type="number" className="w-full bg-white p-4 rounded-xl border border-primary/5 font-black text-accent outline-none" value={localConfig.tasa_cambio} onChange={e => setLocalConfig({...localConfig, tasa_cambio: parseFloat(e.target.value)})} placeholder="Tasa" />
             </div>
           </div>
-          <button onClick={handleSaveConfig} disabled={saving} className="flex items-center gap-2 bg-primary text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-primary/20">
+          <button onClick={handleSaveConfig} disabled={saving} className="flex items-center gap-2 bg-primary text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-primary/20 transition-all active:scale-95">
             {saving ? <Loader2 className="animate-spin" /> : <Save size={18} />} Guardar Configuración
           </button>
         </div>
       )}
 
       {editingProduct && (
-        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6 overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 my-auto max-h-[90vh] overflow-y-auto">
              <div className="flex justify-between items-center mb-8">
                <h3 className="text-3xl font-black text-primary">Editor de Producto</h3>
                <button onClick={() => setEditingProduct(null)} className="p-2 hover:bg-offwhite rounded-full transition-colors"><X /></button>
              </div>
              <div className="space-y-6">
                <ImageUploader label="Imagen del Producto" currentUrl={editingProduct.imagen_url || ''} onUpload={(url) => setEditingProduct({...editingProduct, imagen_url: url})} />
-               <input placeholder="Nombre" className="w-full bg-offwhite p-4 rounded-2xl font-bold" value={editingProduct.nombre} onChange={e => setEditingProduct({...editingProduct, nombre: e.target.value})} />
-               <textarea placeholder="Descripción" className="w-full bg-offwhite p-4 rounded-2xl font-bold h-24" value={editingProduct.descripcion} onChange={e => setEditingProduct({...editingProduct, descripcion: e.target.value})} />
+               <input placeholder="Nombre" className="w-full bg-offwhite p-4 rounded-2xl font-bold outline-none" value={editingProduct.nombre} onChange={e => setEditingProduct({...editingProduct, nombre: e.target.value})} />
+               <textarea placeholder="Descripción" className="w-full bg-offwhite p-4 rounded-2xl font-bold h-24 outline-none resize-none" value={editingProduct.descripcion} onChange={e => setEditingProduct({...editingProduct, descripcion: e.target.value})} />
                <div className="grid grid-cols-2 gap-4">
-                 <input placeholder="Precio" type="number" step="0.01" className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingProduct.precio} onChange={e => setEditingProduct({...editingProduct, precio: parseFloat(e.target.value)})} />
-                 <select className="w-full bg-offwhite p-4 rounded-xl font-bold" disabled={!isSuper} value={editingProduct.departamento} onChange={e => setEditingProduct({...editingProduct, departamento: e.target.value as any})}>
-                   {departments.map(d => <option key={d.id} value={d.slug}>{d.nombre}</option>)}
+                 <input placeholder="Precio" type="number" step="0.01" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingProduct.precio} onChange={e => setEditingProduct({...editingProduct, precio: parseFloat(e.target.value)})} />
+                 <select 
+                    className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" 
+                    value={editingProduct.departamento} 
+                    onChange={e => setEditingProduct({...editingProduct, departamento: e.target.value as any})}
+                 >
+                   {departments
+                     .filter(d => isSuper || myDeptSlugs.includes(d.slug))
+                     .map(d => <option key={d.id} value={d.slug}>{d.nombre}</option>)
+                   }
                  </select>
                </div>
-               <select className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingProduct.unidad} onChange={e => setEditingProduct({...editingProduct, unidad: e.target.value as any})}>
+               <select className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingProduct.unidad} onChange={e => setEditingProduct({...editingProduct, unidad: e.target.value as any})}>
                  {UNIDADES.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                </select>
-               <button onClick={handleSaveProduct} disabled={saving} className="w-full bg-primary text-white py-5 rounded-2xl font-black shadow-xl">
-                 {saving ? <Loader2 className="animate-spin mx-auto" /> : "Guardar Producto"}
+               <button onClick={handleSaveProduct} disabled={saving} className="w-full bg-primary text-white py-5 rounded-2xl font-black shadow-xl transition-all active:scale-95 flex items-center justify-center">
+                 {saving ? <Loader2 className="animate-spin" /> : "Guardar Producto"}
                </button>
              </div>
           </div>
@@ -361,8 +419,8 @@ const AdminPanel: React.FC<{
                  <div className="flex justify-between items-start mb-4">
                    <h3 className="font-black text-lg">{d.nombre}</h3>
                    <div className="flex gap-2">
-                     <button onClick={() => setEditingDept(d)} className="p-2 bg-white rounded-lg shadow-sm"><Edit3 size={14} /></button>
-                     <button onClick={async () => { if(confirm("¿Eliminar?")){ await db.deleteDepartment(d.id); onRefresh(); } }} className="p-2 bg-white text-red-400 rounded-lg shadow-sm"><Trash2 size={14} /></button>
+                     <button onClick={() => setEditingDept(d)} className="p-2 bg-white rounded-lg shadow-sm hover:bg-primary/5 transition-colors"><Edit3 size={14} /></button>
+                     <button onClick={async () => { if(confirm("¿Eliminar?")){ await db.deleteDepartment(d.id); onRefresh(); } }} className="p-2 bg-white text-red-400 rounded-lg shadow-sm hover:bg-red-50 transition-colors"><Trash2 size={14} /></button>
                    </div>
                  </div>
                  <p className="text-[10px] font-black text-primary/30 uppercase">+{d.telefono_whatsapp}</p>
@@ -373,18 +431,21 @@ const AdminPanel: React.FC<{
       )}
 
       {editingDept && (
-        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="bg-white w-full max-md rounded-[3rem] p-10 shadow-2xl animate-in slide-in-from-bottom-10">
+        <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6 overflow-y-auto">
+          <div className="bg-white w-full max-md rounded-[3rem] p-10 shadow-2xl animate-in slide-in-from-bottom-10 my-auto">
              <div className="flex justify-between items-center mb-6">
-               <h3 className="text-2xl font-black text-primary">Depto</h3>
+               <h3 className="text-2xl font-black text-primary">Gestionar Departamento</h3>
                <button onClick={() => setEditingDept(null)}><X /></button>
              </div>
              <div className="space-y-4">
-               <input placeholder="Nombre" className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingDept.nombre} onChange={e => setEditingDept({...editingDept, nombre: e.target.value})} />
-               <input placeholder="Slug" className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingDept.slug} onChange={e => setEditingDept({...editingDept, slug: e.target.value?.toLowerCase().replace(/\s+/g, '-') as any})} />
-               <input placeholder="WhatsApp" className="w-full bg-offwhite p-4 rounded-xl font-bold" value={editingDept.telefono_whatsapp} onChange={e => setEditingDept({...editingDept, telefono_whatsapp: e.target.value})} />
-               <input type="color" className="w-full h-12 rounded-lg cursor-pointer bg-transparent border-none" value={editingDept.color_hex} onChange={e => setEditingDept({...editingDept, color_hex: e.target.value})} />
-               <button onClick={async () => { await db.upsertDepartment(editingDept); setEditingDept(null); onRefresh(); }} className="w-full bg-primary text-white py-4 rounded-2xl font-black shadow-lg">Guardar</button>
+               <input placeholder="Nombre" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingDept.nombre} onChange={e => setEditingDept({...editingDept, nombre: e.target.value})} />
+               <input placeholder="Slug" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingDept.slug} onChange={e => setEditingDept({...editingDept, slug: e.target.value?.toLowerCase().replace(/\s+/g, '-') as any})} />
+               <input placeholder="WhatsApp" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingDept.telefono_whatsapp} onChange={e => setEditingDept({...editingDept, telefono_whatsapp: e.target.value})} />
+               <div className="flex items-center gap-4 bg-offwhite p-4 rounded-xl">
+                 <span className="text-xs font-bold text-primary/50 uppercase">Color de Marca:</span>
+                 <input type="color" className="w-12 h-12 rounded-lg cursor-pointer bg-transparent border-none" value={editingDept.color_hex} onChange={e => setEditingDept({...editingDept, color_hex: e.target.value})} />
+               </div>
+               <button onClick={async () => { await db.upsertDepartment(editingDept); setEditingDept(null); onRefresh(); }} className="w-full bg-primary text-white py-4 rounded-2xl font-black shadow-lg transition-all active:scale-95">Guardar Cambios</button>
              </div>
           </div>
         </div>
@@ -490,7 +551,6 @@ const CheckoutView: React.FC<{
 
   const handlePhoneChange = async (val: string) => {
     setFormData(prev => ({ ...prev, telefono: val }));
-    // Si el número tiene longitud suficiente (ej: 10 u 11 dígitos), buscar
     if (val.replace(/\D/g, '').length >= 10) {
       setSearching(true);
       try {
@@ -502,7 +562,6 @@ const CheckoutView: React.FC<{
             direccion: lastOrder.direccion
           }));
           setFound(true);
-          // Ocultar el mensaje de éxito después de 3 seg
           setTimeout(() => setFound(false), 3000);
         }
       } catch (e) {
@@ -602,7 +661,6 @@ const App: React.FC = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [config, setConfig] = useState<Config>(CONFIG_STUB);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [view, setView] = useState<'home' | 'cart' | 'checkout' | 'success' | 'admin' | 'login'>('home');
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
@@ -618,7 +676,7 @@ const App: React.FC = () => {
       setDepartments(dResult);
       if (cResult) setConfig(cResult);
     } catch (e: any) { 
-      setError(e.message || "Error de base de datos");
+      console.error("Error al refrescar datos:", e.message);
     } finally { setLoading(false); }
   };
 
@@ -756,12 +814,12 @@ _Generado desde Jx4 Catálogo_`;
                            <span className="font-black text-sm">{i.quantity}</span>
                            <button onClick={() => setCart(cart.map(x => x.id === i.id ? {...x, quantity: Math.max(1, x.quantity - 1)} : x))}><Minus size={14} /></button>
                          </div>
-                         <button onClick={() => setCart(cart.filter(x => x.id !== i.id))} className="text-red-300 p-2"><Trash2 size={20} /></button>
+                         <button onClick={() => setCart(cart.filter(x => x.id !== i.id))} className="text-red-300 p-2 hover:bg-red-50 rounded-full transition-colors"><Trash2 size={20} /></button>
                        </div>
                      ))}
                      <div className="p-10 glassmorphism rounded-[2.5rem] mt-10 shadow-xl border border-white text-center">
                         <div className="flex justify-between items-center font-black text-4xl mb-6 text-primary tracking-tighter"><span>Total:</span> <span>${cart.reduce((a,b) => a+(b.precio*b.quantity), 0).toFixed(2)}</span></div>
-                        <button onClick={() => setView('checkout')} className="w-full bg-primary text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-2xl hover:bg-accent transition-all">Continuar <ArrowRight size={24} /></button>
+                        <button onClick={() => setView('checkout')} className="w-full bg-primary text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-2xl hover:bg-accent transition-all active:scale-95">Continuar <ArrowRight size={24} /></button>
                      </div>
                   </div>
                 )}
@@ -775,18 +833,18 @@ _Generado desde Jx4 Catálogo_`;
                <div className="w-32 h-32 bg-green-50 rounded-full flex items-center justify-center mb-10 border border-green-100"><CheckCircle2 size={80} className="text-green-500" /></div>
                <h2 className="text-5xl font-black mb-6 tracking-tighter text-primary">¡Pedido Enviado!</h2>
                <p className="text-primary/50 mb-12 max-w-sm text-lg">Tu orden <strong>{currentOrder.order_id}</strong> se ha procesado exitosamente. Recibirás respuesta por WhatsApp.</p>
-               <button onClick={() => setView('home')} className="bg-primary text-white px-16 py-5 rounded-2xl font-black text-xl shadow-2xl">Volver al Inicio</button>
+               <button onClick={() => setView('home')} className="bg-primary text-white px-16 py-5 rounded-2xl font-black text-xl shadow-2xl transition-all active:scale-95">Volver al Inicio</button>
             </div>
           )}
         </main>
 
         <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md glassmorphism rounded-full px-10 py-5 flex items-center justify-between shadow-2xl z-50 border border-white/40">
-          <button onClick={() => setView('home')} className={`p-2 transition-all ${view === 'home' ? 'text-accent scale-125' : 'text-primary/30'}`}><Home size={28} /></button>
-          <button onClick={() => setView('cart')} className={`p-2 relative transition-all ${view === 'cart' ? 'text-accent scale-125' : 'text-primary/30'}`}>
+          <button onClick={() => setView('home')} className={`p-2 transition-all hover:scale-110 active:scale-90 ${view === 'home' ? 'text-accent scale-125' : 'text-primary/30'}`}><Home size={28} /></button>
+          <button onClick={() => setView('cart')} className={`p-2 relative transition-all hover:scale-110 active:scale-90 ${view === 'cart' ? 'text-accent scale-125' : 'text-primary/30'}`}>
             <ShoppingBag size={28} />
             {totalCart > 0 && <span className="absolute -top-1 -right-1 bg-accent text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-lg">{totalCart}</span>}
           </button>
-          <button onClick={() => currentUser ? setView('admin') : setView('login')} className={`p-2 transition-all ${view === 'admin' || view === 'login' ? 'text-accent scale-125' : 'text-primary/30'}`}><Settings size={28} /></button>
+          <button onClick={() => currentUser ? setView('admin') : setView('login')} className={`p-2 transition-all hover:scale-110 active:scale-90 ${view === 'admin' || view === 'login' ? 'text-accent scale-125' : 'text-primary/30'}`}><Settings size={28} /></button>
         </nav>
       </div>
     </HashRouter>

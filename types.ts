@@ -10,7 +10,7 @@ export interface AdminUser {
   username: string;
   password?: string;
   role: UserRole;
-  dept_slug?: DepartmentSlug;
+  dept_slugs?: DepartmentSlug[]; // Cambiado de dept_slug a dept_slugs (arreglo)
 }
 
 export interface Product {
