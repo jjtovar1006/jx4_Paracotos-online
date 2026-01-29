@@ -7,18 +7,28 @@
   <meta name="google" content="notranslate">
   <title>JX4 Paracotos v11.0</title>
   <script>
-    // Shim global robusto para entornos de navegador (Vercel/Static)
-    window.process = window.process || { env: { NODE_ENV: 'production' } };
-    if (!window.process.env) window.process.env = {};
-    
-    // Inyección de variables de entorno para que estén disponibles globalmente
-    // Vercel inyectará estas variables si están configuradas en el panel
-    window.process.env.API_KEY = window.process.env.API_KEY || '';
-    window.process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://lgdixakavpqlxgltzuei.supabase.co';
-    window.process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ';
-    
-    // Asegurar que 'process' sea accesible sin 'window.'
-    var process = window.process;
+    // Shim global ultra-robusto para evitar pantallas blancas por ReferenceError: process is not defined
+    (function() {
+      var processShim = {
+        env: {
+          NODE_ENV: 'production',
+          API_KEY: '',
+          NEXT_PUBLIC_SUPABASE_URL: 'https://lgdixakavpqlxgltzuei.supabase.co',
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ'
+        }
+      };
+      
+      try {
+        Object.defineProperty(window, 'process', {
+          value: processShim,
+          enumerable: true,
+          configurable: true,
+          writable: true
+        });
+      } catch (e) {
+        window.process = processShim;
+      }
+    })();
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -89,6 +99,7 @@
     "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
     "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react-dom/client": "https://esm.sh/react-dom@^19.2.4/client",
     "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.0"
   }

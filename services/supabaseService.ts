@@ -3,8 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 
 const getEnv = (key: string, fallback: string): string => {
   try {
-    const win = window as any;
-    return win.process?.env?.[key] || process.env[key] || fallback;
+    // Intento de acceso seguro a process.env
+    const val = (typeof process !== 'undefined' && process.env) ? process.env[key] : null;
+    return val || fallback;
   } catch (e) {
     return fallback;
   }
@@ -13,11 +14,13 @@ const getEnv = (key: string, fallback: string): string => {
 const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://lgdixakavpqlxgltzuei.supabase.co');
 const supabaseAnonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ');
 
-let supabase: any;
+let supabase: any = null;
 try {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
+  if (supabaseUrl && supabaseAnonKey) {
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
+  }
 } catch (e) {
-  console.error("Fallo crítico al inicializar Supabase:", e);
+  console.error("Error al inicializar cliente Supabase:", e);
 }
 
 const isUuidString = (v: any) => {
@@ -55,7 +58,7 @@ const cleanPayload = (payload: any): any => {
 };
 
 export async function uploadImage(file: File, bucket: string = 'public-assets'): Promise<string> {
-  if (!supabase) throw new Error("Supabase no inicializado");
+  if (!supabase) throw new Error("Servidor no disponible momentáneamente.");
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
   const filePath = `uploads/${fileName}`;
@@ -67,17 +70,14 @@ export async function uploadImage(file: File, bucket: string = 'public-assets'):
 
 export const db = {
   login: async (username: string, password: string) => {
-    if (!supabase) throw new Error("Error de conexión");
+    if (!supabase) throw new Error("Error de conexión con el servidor.");
 
-    // 1. Llamar a la Edge Function para validar credenciales (Auth)
     const { data: functionData, error: functionError } = await supabase.functions.invoke('login-by-username', {
       body: { username, password }
     });
 
     if (functionError) {
-      // Manejar errores específicos de la función
       if (functionError.message?.includes('401')) throw new Error("Credenciales inválidas.");
-      if (functionError.message?.includes('404')) throw new Error("Usuario no encontrado.");
       throw new Error(`Error de autenticación: ${functionError.message}`);
     }
 
@@ -85,7 +85,6 @@ export const db = {
        throw new Error(functionData?.error || "Error al iniciar sesión.");
     }
 
-    // 2. Si la función fue exitosa, buscamos el perfil extendido en 'admin_users'
     const { data: adminData, error: adminError } = await supabase
       .from('admin_users')
       .select('*')
@@ -93,9 +92,8 @@ export const db = {
       .maybeSingle();
 
     if (adminError) throw new Error(`Error al recuperar perfil: ${adminError.message}`);
-    if (!adminData) throw new Error("El usuario está autenticado pero no tiene perfil de administrador.");
+    if (!adminData) throw new Error("Perfil de administrador no encontrado.");
 
-    // Establecer la sesión en el cliente (opcional, dependiendo de si quieres persistencia nativa)
     if (functionData.access_token) {
       await supabase.auth.setSession({
         access_token: functionData.access_token,
@@ -112,12 +110,14 @@ export const db = {
     return data || [];
   },
   upsertAdmin: async (user: any) => {
+    if (!supabase) return null;
     const payload = cleanPayload(user);
     const { data, error } = await supabase.from('admin_users').upsert(payload).select();
     if (error) throw error;
     return data;
   },
   deleteAdmin: async (id: string) => {
+    if (!supabase) return;
     const { error } = await supabase.from('admin_users').delete().eq('id', id);
     if (error) throw error;
   },
@@ -130,12 +130,14 @@ export const db = {
     return data || [];
   },
   upsertProduct: async (product: any) => {
+    if (!supabase) return null;
     const payload = cleanPayload(product);
     const { data, error } = await supabase.from('products').upsert(payload).select();
     if (error) throw error;
     return data;
   },
   deleteProduct: async (id: string) => {
+    if (!supabase) return;
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) throw error;
   },
@@ -146,12 +148,14 @@ export const db = {
     return data || [];
   },
   upsertDepartment: async (dept: any) => {
+    if (!supabase) return null;
     const payload = cleanPayload(dept);
     const { data, error } = await supabase.from('departments').upsert(payload).select();
     if (error) throw error;
     return data;
   },
   deleteDepartment: async (id: string) => {
+    if (!supabase) return;
     const { error } = await supabase.from('departments').delete().eq('id', id);
     if (error) throw error;
   },
@@ -162,11 +166,13 @@ export const db = {
     return data;
   },
   updateConfig: async (config: any) => {
+    if (!supabase) return null;
     const { data, error } = await supabase.from('site_config').upsert({ id: 1, ...config }).select();
     if (error) throw error;
     return data;
   },
   saveOrder: async (order: any) => {
+    if (!supabase) throw new Error("Servicio de pedidos no disponible.");
     const payload = cleanPayload(order);
     const { data, error } = await supabase.from('orders').insert(payload).select();
     if (error) throw new Error(error.message);
