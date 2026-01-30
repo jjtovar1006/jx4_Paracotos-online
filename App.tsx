@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { 
   ShoppingBag, Plus, Minus, Trash2, ArrowRight, CheckCircle2, 
@@ -289,7 +289,7 @@ const AdminPanel: React.FC<{
             <div key={o.id} className="glassmorphism p-5 rounded-[2rem] shadow-sm border border-white flex flex-col">
               <div className="flex justify-between items-start mb-3">
                 <span className="text-[10px] font-black text-primary/20 uppercase">#{o.order_id}</span>
-                <Badge variant="success">${o.total.toFixed(2)}</Badge>
+                <Badge variant="success">${Number(o.total).toFixed(2)}</Badge>
               </div>
               <h4 className="font-bold text-lg">{o.nombre_cliente}</h4>
               <p className="text-xs text-primary/50 mb-4">{o.departamento.toUpperCase()}</p>
@@ -327,10 +327,10 @@ const AdminPanel: React.FC<{
                     <td className="p-4"><img src={p.imagen_url} className="w-10 h-10 rounded-lg object-cover bg-white" /></td>
                     <td className="font-black">{p.nombre}</td>
                     <td><Badge>{p.departamento}</Badge></td>
-                    <td className="font-bold">${p.precio}</td>
+                    <td className="font-bold">${Number(p.precio).toFixed(2)}</td>
                     <td className="p-4 flex justify-center gap-2">
                       <button onClick={() => setEditingProduct(p)} className="p-2 text-accent bg-white rounded-lg shadow-sm hover:text-accent-dark"><Edit3 size={16} /></button>
-                      <button onClick={async () => { if(confirm("¿Eliminar?")){ await db.deleteProduct(p.id); onRefresh(); } }} className="p-2 text-red-400 bg-white rounded-lg shadow-sm hover:text-red-600"><Trash2 size={16} /></button>
+                      <button onClick={async () => { if(confirm("¿Eliminar?")){ await db.deleteProduct(p.id!); onRefresh(); } }} className="p-2 text-red-400 bg-white rounded-lg shadow-sm hover:text-red-600"><Trash2 size={16} /></button>
                     </td>
                   </tr>
                 ))}
@@ -414,7 +414,7 @@ const AdminPanel: React.FC<{
                    <h3 className="font-black text-lg">{d.nombre}</h3>
                    <div className="flex gap-2">
                      <button onClick={() => setEditingDept(d)} className="p-2 bg-white rounded-lg shadow-sm hover:bg-primary/5 transition-colors"><Edit3 size={14} /></button>
-                     <button onClick={async () => { if(confirm("¿Eliminar departamento?")){ await db.deleteDepartment(d.id); onRefresh(); } }} className="p-2 bg-white text-red-400 rounded-lg shadow-sm hover:bg-red-50 transition-colors"><Trash2 size={14} /></button>
+                     <button onClick={async () => { if(confirm("¿Eliminar departamento?")){ await db.deleteDepartment(d.id!); onRefresh(); } }} className="p-2 bg-white text-red-400 rounded-lg shadow-sm hover:bg-red-50 transition-colors"><Trash2 size={14} /></button>
                    </div>
                  </div>
                  <p className="text-[10px] font-black text-primary/30 uppercase tracking-widest">+{d.telefono_whatsapp}</p>
@@ -569,6 +569,9 @@ const ProductCard: React.FC<{ product: Product; tasa: number; onAdd: (p: Product
     finally { setLoadingTip(false); }
   };
 
+  const safePrecio = Number(product.precio);
+  const safeTasa = Number(tasa);
+
   return (
     <div className="glassmorphism rounded-[2rem] overflow-hidden group hover:-translate-y-1 transition-all duration-300 shadow-sm border border-white flex flex-col h-full">
       <div className="aspect-square relative overflow-hidden bg-white shrink-0">
@@ -598,8 +601,8 @@ const ProductCard: React.FC<{ product: Product; tasa: number; onAdd: (p: Product
         
         <div className="flex justify-between items-center mt-auto">
           <div>
-            <div className="text-xl font-black text-primary">${product.precio.toFixed(2)}</div>
-            <div className="text-[10px] font-bold text-primary/30">Bs. {(product.precio * tasa).toFixed(2)}</div>
+            <div className="text-xl font-black text-primary">${safePrecio.toFixed(2)}</div>
+            <div className="text-[10px] font-bold text-primary/30">Bs. {(safePrecio * safeTasa).toFixed(2)}</div>
           </div>
           <button onClick={() => onAdd(product)} className="bg-primary text-white p-3 rounded-2xl hover:bg-accent transition-all shadow-lg active:scale-95">
             <Plus size={20} />
@@ -780,7 +783,8 @@ const App: React.FC = () => {
 
   const finalizeOrder = async (orderData: Partial<Order>) => {
     if (cart.length === 0) return;
-    const totalUSD = cart.reduce((acc, i) => acc + (i.precio * i.quantity), 0);
+    const safeTasa = Number(config.tasa_cambio);
+    const totalUSD = cart.reduce((acc, i) => acc + (Number(i.precio) * Number(i.quantity)), 0);
     const order: Order = {
       order_id: `JX4-${Date.now()}`,
       nombre_cliente: orderData.nombre_cliente || '',
@@ -788,7 +792,7 @@ const App: React.FC = () => {
       direccion: orderData.direccion || '',
       productos: cart,
       total: totalUSD,
-      total_bs: totalUSD * config.tasa_cambio,
+      total_bs: totalUSD * safeTasa,
       metodo_pago: 'pago_movil',
       metodo_entrega: orderData.metodo_entrega || 'retiro',
       estado: 'pendiente',
@@ -802,7 +806,7 @@ const App: React.FC = () => {
       setCart([]);
       setView('success');
       const dept = departments.find(d => d.slug === order.departamento);
-      const text = `🛒 *NUEVO PEDIDO JX4*\n--------------------\n👤 *Cliente:* ${order.nombre_cliente.toUpperCase()}\n📞 *WhatsApp:* ${order.telefono_cliente}\n🚚 *Método:* ${order.metodo_entrega}\n\n📦 *PRODUCTOS:*\n${order.productos.map(p => `- ${p.nombre} x${p.quantity} ($${(p.precio * p.quantity).toFixed(2)})`).join('\n')}\n\n💵 *TOTAL USD:* $${order.total.toFixed(2)}\n💰 *TOTAL BS:* Bs. ${order.total_bs.toLocaleString('es-VE')}\n\n📍 *Dirección:* ${order.direccion}\n📝 *Notas:* ${order.notas || 'Sin notas.'}`;
+      const text = `🛒 *NUEVO PEDIDO JX4*\n--------------------\n👤 *Cliente:* ${order.nombre_cliente.toUpperCase()}\n📞 *WhatsApp:* ${order.telefono_cliente}\n🚚 *Método:* ${order.metodo_entrega}\n\n📦 *PRODUCTOS:*\n${order.productos.map(p => `- ${p.nombre} x${p.quantity} ($${(Number(p.precio) * Number(p.quantity)).toFixed(2)})`).join('\n')}\n\n💵 *TOTAL USD:* $${order.total.toFixed(2)}\n💰 *TOTAL BS:* Bs. ${order.total_bs.toLocaleString('es-VE')}\n\n📍 *Dirección:* ${order.direccion}\n📝 *Notas:* ${order.notas || 'Sin notas.'}`;
       window.open(`https://wa.me/${dept?.telefono_whatsapp || config.whatsapp_general}?text=${encodeURIComponent(text)}`, '_blank');
     } catch (e: any) { alert("Error al guardar: " + e.message); }
   };
@@ -859,7 +863,7 @@ const App: React.FC = () => {
                          <img src={i.imagen_url} className="w-20 h-20 rounded-2xl object-cover bg-white" />
                          <div className="flex-1">
                            <h4 className="font-bold text-primary">{i.nombre}</h4>
-                           <p className="text-xs text-primary/40 font-bold">${i.precio.toFixed(2)}</p>
+                           <p className="text-xs text-primary/40 font-bold">${Number(i.precio).toFixed(2)}</p>
                          </div>
                          <div className="flex flex-col items-center gap-1 bg-offwhite p-1 rounded-xl">
                            <button onClick={() => setCart(cart.map(x => x.id === i.id ? {...x, quantity: x.quantity + 1} : x))}><Plus size={14} /></button>
@@ -870,7 +874,7 @@ const App: React.FC = () => {
                        </div>
                      ))}
                      <div className="p-10 glassmorphism rounded-[2.5rem] mt-10 text-center">
-                        <div className="flex justify-between items-center font-black text-4xl mb-6 text-primary tracking-tighter"><span>Total:</span> <span>${cart.reduce((a,b) => a+(b.precio*b.quantity), 0).toFixed(2)}</span></div>
+                        <div className="flex justify-between items-center font-black text-4xl mb-6 text-primary tracking-tighter"><span>Total:</span> <span>${cart.reduce((a,b) => a+(Number(b.precio)*Number(b.quantity)), 0).toFixed(2)}</span></div>
                         <button onClick={() => setView('checkout')} className="w-full bg-primary text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-2xl hover:bg-accent transition-all active:scale-95">Continuar <ArrowRight size={24} /></button>
                      </div>
                   </div>

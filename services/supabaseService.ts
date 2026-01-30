@@ -6,13 +6,21 @@ const databaseUrl = (window as any).process?.env?.DATABASE_URL || 'postgresql://
 const sql = neon(databaseUrl);
 
 /**
- * Simulación de carga de imagen. 
+ * Convierte el archivo seleccionado a un Data URL (base64)
+ * para que pueda almacenarse directamente en la base de datos Neon (columna TEXT).
  */
 export async function uploadImage(file: File): Promise<string> {
-  console.log("Subida simulada de imagen:", file.name);
-  await new Promise(resolve => setTimeout(resolve, 800));
-  // Retorna un placeholder de alta calidad basado en el nombre del archivo
-  return `https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&q=80`; 
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(reader.result as string);
+    };
+    reader.onerror = (error) => {
+      console.error("Error al leer el archivo:", error);
+      reject(new Error("No se pudo procesar la imagen."));
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 export const db = {
