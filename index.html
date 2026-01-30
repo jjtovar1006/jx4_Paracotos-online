@@ -5,14 +5,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google" content="notranslate">
-  <title>JX4 Paracotos v11.0</title>
+  <title>JX4 Paracotos v11.0 - Neon Powered</title>
   <script>
-    // Shim para Vercel: Define process.env antes de que cualquier script se ejecute
+    // Shim para compatibilidad con Vercel y variables de entorno
     window.process = window.process || {};
     window.process.env = {
       NODE_ENV: 'production',
-      NEXT_PUBLIC_SUPABASE_URL: 'https://lgdixakavpqlxgltzuei.supabase.co',
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ',
+      DATABASE_URL: 'postgresql://neondb_owner:npg_ApK0uye7xODV@ep-calm-cake-ahbbwe7i-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require',
       API_KEY: '' 
     };
   </script>
@@ -67,7 +66,7 @@
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
     "react-dom/client": "https://esm.sh/react-dom@^19.2.4/client",
     "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.0"
+    "@neondatabase/serverless": "https://esm.sh/@neondatabase/serverless@^0.10.4"
   }
 }
 </script>

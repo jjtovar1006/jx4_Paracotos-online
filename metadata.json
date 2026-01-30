@@ -1,6 +1,6 @@
 {
-  "name": "JX4 Paracotos v11.0",
-  "description": "Plataforma de comercio electrónico multi-departamento de alto rendimiento con integración de Supabase y WhatsApp.",
+  "name": "JX4 Paracotos v11.0 - Neon Edition",
+  "description": "Plataforma de comercio electrónico multi-departamento de alto rendimiento con integración de Neon Postgres y WhatsApp.",
   "requestFramePermissions": [
     "camera"
   ]

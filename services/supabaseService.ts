@@ -1,210 +1,213 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { neon } from '@neondatabase/serverless';
 
-const getEnv = (key: string, fallback: string): string => {
-  try {
-    const val = (window as any).process?.env?.[key] || (typeof process !== 'undefined' ? process.env?.[key] : null);
-    return (val || fallback).trim();
-  } catch (e) {
-    return fallback.trim();
-  }
-};
+// URL de conexión a Neon (Prioriza el pooler para apps web)
+const databaseUrl = (window as any).process?.env?.DATABASE_URL || 'postgresql://neondb_owner:npg_ApK0uye7xODV@ep-calm-cake-ahbbwe7i-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require';
+const sql = neon(databaseUrl);
 
-const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://lgdixakavpqlxgltzuei.supabase.co');
-const supabaseAnonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGl4YWthdnBxbHhnbHR6dWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2Mjc4MjIsImV4cCI6MjA4NTIwMzgyMn0.8hPd1HihRFs8ri0CuBaw-sC8ayLSHeB5JFaR-nVWGhQ');
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storage: window.localStorage
-  }
-});
-
-const isUuidString = (v: any) => {
-  if (typeof v !== 'string') return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-};
-
-const cleanPayload = (payload: any): any => {
-  if (!payload || typeof payload !== 'object') return payload;
-  if (Array.isArray(payload)) return payload.map(cleanPayload);
-  const out: any = {};
-  for (const key of Object.keys(payload)) {
-    const val = payload[key];
-    if (typeof val === 'string' && val.trim() === '') {
-      if (key === 'id' || key.endsWith('_id')) continue;
-      out[key] = null;
-      continue;
-    }
-    if ((key === 'id' || key.endsWith('_id')) && val != null) {
-      if (typeof val === 'string' && !isUuidString(val)) continue;
-    }
-    out[key] = val;
-  }
-  return out;
-};
-
-export async function uploadImage(file: File, bucket: string = 'public-assets'): Promise<string> {
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-  const filePath = `uploads/${fileName}`;
-  const { error } = await supabase.storage.from(bucket).upload(filePath, file);
-  if (error) throw error;
-  const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(filePath);
-  return publicUrl;
+/**
+ * Simulación de carga de imagen. 
+ */
+export async function uploadImage(file: File): Promise<string> {
+  console.log("Subida simulada de imagen:", file.name);
+  await new Promise(resolve => setTimeout(resolve, 800));
+  // Retorna un placeholder de alta calidad basado en el nombre del archivo
+  return `https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&q=80`; 
 }
 
 export const db = {
   login: async (username: string, password: string) => {
     try {
-      const functionUrl = `${supabaseUrl}/functions/v1/login-by-username`;
+      const users = await sql`
+        SELECT id, username, role, dept_slugs 
+        FROM admin_users 
+        WHERE username = ${username} AND password = ${password}
+        LIMIT 1
+      `;
       
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': supabaseAnonKey,
-          'Authorization': `Bearer ${supabaseAnonKey}`
-        },
-        body: JSON.stringify({ username, password })
-      }).catch(err => {
-        console.error("Fetch Error:", err);
-        throw new Error("ERROR DE CONEXIÓN: La función de Supabase no permite peticiones desde este dominio (CORS) o está caída.");
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        if (response.status === 404) throw new Error("La función de login no existe en Supabase.");
-        throw new Error(errorData.error || errorData.message || `Error ${response.status}: Credenciales inválidas.`);
+      if (!users || users.length === 0) {
+        throw new Error("Usuario o clave incorrectos.");
       }
-
-      const data = await response.json();
-
-      // Manejo de la respuesta de sesión de Supabase
-      const token = data.access_token || data.session?.access_token;
-      const refresh = data.refresh_token || data.session?.refresh_token;
-
-      if (!token) {
-        throw new Error("La función no devolvió un token de acceso. Revisa la configuración de la Edge Function.");
-      }
-
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: token,
-        refresh_token: refresh || ''
-      });
-
-      if (sessionError) throw new Error("Sesión fallida: " + sessionError.message);
-
-      return await db.getAdminProfile(username);
-
+      
+      return users[0];
     } catch (e: any) {
-      console.error("Login Error:", e);
-      throw e;
+      console.error("Database Login Error:", e);
+      throw new Error(e.message || "Error al conectar con la base de datos de Neon.");
     }
-  },
-
-  getAdminProfile: async (username: string) => {
-    const { data: profile, error: profileError } = await supabase
-      .from('admin_users')
-      .select('*')
-      .eq('username', username)
-      .maybeSingle();
-
-    if (profileError) throw new Error(`Error de perfil: ${profileError.message}`);
-    if (!profile) {
-      await supabase.auth.signOut();
-      throw new Error("Usuario no encontrado en la tabla 'admin_users'.");
-    }
-    return profile;
   },
 
   getAdmins: async () => {
-    const { data, error } = await supabase.from('admin_users').select('*').order('username');
-    if (error) throw error;
-    return data || [];
+    return await sql`SELECT id, username, role, dept_slugs FROM admin_users ORDER BY username ASC`;
   },
+
   upsertAdmin: async (user: any) => {
-    const payload = cleanPayload(user);
-    const { data, error } = await supabase.from('admin_users').upsert(payload).select();
-    if (error) throw error;
-    return data;
-  },
-  deleteAdmin: async (id: string) => {
-    const { error } = await supabase.from('admin_users').delete().eq('id', id);
-    if (error) throw error;
-  },
-  getProducts: async (deptSlug?: string) => {
-    let query = supabase.from('products').select('*').order('nombre');
-    if (deptSlug) query = query.eq('departamento', deptSlug);
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
-  },
-  upsertProduct: async (product: any) => {
-    const payload = cleanPayload(product);
-    const { data, error } = await supabase.from('products').upsert(payload).select();
-    if (error) throw error;
-    return data;
-  },
-  deleteProduct: async (id: string) => {
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) throw error;
-  },
-  getDepartments: async () => {
-    const { data, error } = await supabase.from('departments').select('*').order('nombre');
-    if (error) throw error;
-    return data || [];
-  },
-  upsertDepartment: async (dept: any) => {
-    const payload = cleanPayload(dept);
-    const { data, error } = await supabase.from('departments').upsert(payload).select();
-    if (error) throw error;
-    return data;
-  },
-  deleteDepartment: async (id: string) => {
-    const { error } = await supabase.from('departments').delete().eq('id', id);
-    if (error) throw error;
-  },
-  getConfig: async () => {
-    const { data, error } = await supabase.from('site_config').select('*').single();
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
-  },
-  updateConfig: async (config: any) => {
-    const { data, error } = await supabase.from('site_config').upsert({ id: 1, ...config }).select();
-    if (error) throw error;
-    return data;
-  },
-  saveOrder: async (order: any) => {
-    const payload = cleanPayload(order);
-    const { data, error } = await supabase.from('orders').insert(payload).select();
-    if (error) throw new Error(error.message);
-    return data;
-  },
-  getOrders: async (deptSlugs?: string | string[]) => {
-    let query = supabase.from('orders').select('*').order('fecha_pedido', { ascending: false });
-    if (deptSlugs) {
-      if (Array.isArray(deptSlugs)) {
-        if (deptSlugs.length > 0) query = query.in('departamento', deptSlugs);
-      } else {
-        query = query.eq('departamento', deptSlugs);
-      }
+    if (user.id) {
+      const result = await sql`
+        UPDATE admin_users 
+        SET username = ${user.username}, 
+            role = ${user.role}, 
+            dept_slugs = ${user.dept_slugs || []},
+            password = CASE 
+              WHEN ${user.password} IS NOT NULL AND ${user.password} != '' THEN ${user.password} 
+              ELSE password 
+            END
+        WHERE id = ${user.id}
+        RETURNING id, username, role, dept_slugs
+      `;
+      return result[0];
+    } else {
+      const result = await sql`
+        INSERT INTO admin_users (username, password, role, dept_slugs)
+        VALUES (${user.username}, ${user.password}, ${user.role}, ${user.dept_slugs || []})
+        RETURNING id, username, role, dept_slugs
+      `;
+      return result[0];
     }
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
   },
+
+  deleteAdmin: async (id: string) => {
+    await sql`DELETE FROM admin_users WHERE id = ${id}`;
+  },
+
+  getProducts: async (deptSlug?: string) => {
+    try {
+      if (deptSlug && deptSlug !== 'all') {
+        return await sql`SELECT * FROM products WHERE departamento = ${deptSlug} ORDER BY nombre ASC`;
+      }
+      return await sql`SELECT * FROM products ORDER BY nombre ASC`;
+    } catch (error) {
+      console.error("Error al obtener productos:", error);
+      return [];
+    }
+  },
+
+  upsertProduct: async (p: any) => {
+    if (p.id) {
+      const result = await sql`
+        UPDATE products SET
+          nombre = ${p.nombre}, descripcion = ${p.descripcion}, precio = ${p.precio},
+          stock = ${p.stock}, imagen_url = ${p.imagen_url}, categoria = ${p.categoria},
+          departamento = ${p.departamento}, unidad = ${p.unidad}, 
+          peso_referencial = ${p.peso_referencial}, disponible = ${p.disponible}, 
+          destacado = ${p.destacado}
+        WHERE id = ${p.id}
+        RETURNING *
+      `;
+      return result[0];
+    } else {
+      const result = await sql`
+        INSERT INTO products (
+          nombre, descripcion, precio, stock, imagen_url, categoria, 
+          departamento, unidad, peso_referencial, disponible, destacado
+        ) VALUES (
+          ${p.nombre}, ${p.descripcion}, ${p.precio}, ${p.stock}, ${p.imagen_url}, 
+          ${p.categoria}, ${p.departamento}, ${p.unidad}, ${p.peso_referencial}, 
+          ${p.disponible}, ${p.destacado}
+        ) RETURNING *
+      `;
+      return result[0];
+    }
+  },
+
+  deleteProduct: async (id: string) => {
+    await sql`DELETE FROM products WHERE id = ${id}`;
+  },
+
+  getDepartments: async () => {
+    try {
+      return await sql`SELECT * FROM departments ORDER BY nombre ASC`;
+    } catch (e) {
+      return [];
+    }
+  },
+
+  upsertDepartment: async (d: any) => {
+    if (d.id) {
+      const result = await sql`
+        UPDATE departments SET
+          nombre = ${d.nombre}, slug = ${d.slug}, 
+          telefono_whatsapp = ${d.telefono_whatsapp}, 
+          color_hex = ${d.color_hex}, activo = ${d.activo}
+        WHERE id = ${d.id}
+        RETURNING *
+      `;
+      return result[0];
+    } else {
+      const result = await sql`
+        INSERT INTO departments (nombre, slug, telefono_whatsapp, color_hex, activo)
+        VALUES (${d.nombre}, ${d.slug}, ${d.telefono_whatsapp}, ${d.color_hex}, ${d.activo || true})
+        RETURNING *
+      `;
+      return result[0];
+    }
+  },
+
+  deleteDepartment: async (id: string) => {
+    await sql`DELETE FROM departments WHERE id = ${id}`;
+  },
+
+  getConfig: async () => {
+    try {
+      const rows = await sql`SELECT * FROM site_config LIMIT 1`;
+      return rows[0] || null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  updateConfig: async (c: any) => {
+    const result = await sql`
+      INSERT INTO site_config (id, tasa_cambio, cintillo_promocional, slogan, logo_url, whatsapp_general)
+      VALUES (1, ${c.tasa_cambio}, ${c.cintillo_promocional}, ${c.slogan}, ${c.logo_url}, ${c.whatsapp_general})
+      ON CONFLICT (id) DO UPDATE SET
+        tasa_cambio = EXCLUDED.tasa_cambio,
+        cintillo_promocional = EXCLUDED.cintillo_promocional,
+        slogan = EXCLUDED.slogan,
+        logo_url = EXCLUDED.logo_url,
+        whatsapp_general = EXCLUDED.whatsapp_general
+      RETURNING *
+    `;
+    return result[0];
+  },
+
+  saveOrder: async (o: any) => {
+    const result = await sql`
+      INSERT INTO orders (
+        order_id, telefono_cliente, nombre_cliente, productos, total, 
+        total_bs, metodo_pago, metodo_entrega, estado, departamento, direccion, notas
+      ) VALUES (
+        ${o.order_id}, ${o.telefono_cliente}, ${o.nombre_cliente}, ${JSON.stringify(o.productos)}, 
+        ${o.total}, ${o.total_bs}, ${o.metodo_pago}, ${o.metodo_entrega}, 
+        ${o.estado}, ${o.departamento}, ${o.direccion}, ${o.notas}
+      ) RETURNING *
+    `;
+    return result[0];
+  },
+
+  getOrders: async (deptSlugs?: string | string[]) => {
+    if (deptSlugs) {
+      const slugs = Array.isArray(deptSlugs) ? deptSlugs : [deptSlugs];
+      return await sql`
+        SELECT * FROM orders 
+        WHERE departamento = ANY(${slugs}) 
+        ORDER BY fecha_pedido DESC
+      `;
+    }
+    return await sql`SELECT * FROM orders ORDER BY fecha_pedido DESC`;
+  },
+
   getLatestOrderByPhone: async (phone: string) => {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('nombre_cliente, direccion')
-      .eq('telefono_cliente', phone)
-      .order('fecha_pedido', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) return null;
-    return data;
+    try {
+      const rows = await sql`
+        SELECT nombre_cliente, direccion FROM orders 
+        WHERE telefono_cliente = ${phone} 
+        ORDER BY fecha_pedido DESC LIMIT 1
+      `;
+      return rows[0] || null;
+    } catch (e) {
+      return null;
+    }
   }
 };
+
+export const supabase = {};

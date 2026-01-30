@@ -1,5 +1,5 @@
 {
-  "name": "jx4-paracotos-v11.0",
+  "name": "jx4-paracotos-v11.0---neon-edition",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -14,7 +14,7 @@
     "lucide-react": "^0.563.0",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.0",
-    "@supabase/supabase-js": "^2.45.0"
+    "@neondatabase/serverless": "^0.10.4"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
