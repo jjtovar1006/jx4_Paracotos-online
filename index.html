@@ -5,12 +5,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google" content="notranslate">
+  <!-- Control estricto de caché para evitar errores 404 en actualizaciones -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>JX4 Paracotos v11.0 - Neon Powered</title>
+  <title>JX4 Paracotos v11.5 - Sistema de Transporte</title>
   <script>
-    // Shim para compatibilidad con Vercel y variables de entorno
     window.process = window.process || {};
     window.process.env = {
       NODE_ENV: 'production',
@@ -44,6 +44,10 @@
       to { opacity: 1; transform: translateY(0); }
     }
     .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+    /* Custom scrollbar para la lista de transportistas */
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #d4a574; border-radius: 10px; }
   </style>
   <script>
     tailwind.config = {

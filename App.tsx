@@ -6,7 +6,7 @@ import {
   Search, Package, Settings, Upload, LogIn, LogOut,
   Save, X, Edit3, Loader2, RefreshCcw, 
   ShieldAlert, Users, Lock, UserPlus, Home, MessageCircle, Sparkles, 
-  AlertCircle, Scale, ShieldCheck, FileText, Info, Wand2, Truck, Car, User
+  AlertCircle, Scale, ShieldCheck, FileText, Info, Wand2, Truck, User, Car
 } from 'lucide-react';
 
 import { Product, CartItem, DepartmentSlug, Order, Config, Department, UnidadMedida, AdminUser } from './types';
@@ -318,16 +318,16 @@ const AdminPanel: React.FC<{
 
       {activeTab === 'productos' && (
         <div className="space-y-6">
-          <button onClick={() => setEditingProduct({ nombre: '', descripcion: '', precio: 0, stock: 0, departamento: isSuper ? 'carnes' : myDeptSlugs[0], unidad: 'kg', disponible: true })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg hover:bg-primary-dark transition-all active:scale-95"><Plus size={18} /> Nuevo Producto</button>
+          <button onClick={() => setEditingProduct({ nombre: '', descripcion: '', precio: 0, stock: 0, departamento: isSuper ? 'carnes' : myDeptSlugs[0], unidad: 'kg', disponible: true })} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg hover:bg-primary-dark transition-all active:scale-95"><Plus size={18} /> Nuevo Registro</button>
           <div className="glassmorphism rounded-[2.5rem] overflow-hidden shadow-sm border border-white overflow-x-auto">
             <table className="w-full text-left min-w-[600px]">
-              <thead className="bg-primary/5 text-[10px] uppercase font-black text-primary/30"><tr className="p-4"><th></th><th className="p-4">Producto</th><th>Depto</th><th>Precio</th><th className="p-4 text-center">Acciones</th></tr></thead>
+              <thead className="bg-primary/5 text-[10px] uppercase font-black text-primary/30"><tr className="p-4"><th></th><th className="p-4">Nombre</th><th>Depto</th><th>Precio</th><th className="p-4 text-center">Acciones</th></tr></thead>
               <tbody className="divide-y divide-primary/5">
                 {filteredProducts.map(p => (
                   <tr key={p.id} className="text-sm font-medium hover:bg-white/40">
                     <td className="p-4"><img src={p.imagen_url} className="w-10 h-10 rounded-lg object-cover bg-white" /></td>
                     <td className="font-black">{p.nombre}</td>
-                    <td><Badge>{p.departamento}</Badge></td>
+                    <td><Badge variant={p.departamento === 'transporte' ? 'warning' : 'primary'}>{p.departamento}</Badge></td>
                     <td className="font-bold">${Number(p.precio).toFixed(2)}</td>
                     <td className="p-4 flex justify-center gap-2">
                       <button onClick={() => setEditingProduct(p)} className="p-2 text-accent bg-white rounded-lg shadow-sm hover:text-accent-dark"><Edit3 size={16} /></button>
@@ -345,15 +345,15 @@ const AdminPanel: React.FC<{
         <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6 overflow-y-auto">
           <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 my-auto max-h-[90vh] overflow-y-auto">
              <div className="flex justify-between items-center mb-8">
-               <h3 className="text-3xl font-black text-primary">Editor de Producto</h3>
+               <h3 className="text-3xl font-black text-primary">Editor de Registro</h3>
                <button onClick={() => setEditingProduct(null)} className="p-2 hover:bg-offwhite rounded-full transition-colors"><X /></button>
              </div>
              <div className="space-y-6">
-               <ImageUploader label="Imagen del Producto" currentUrl={editingProduct.imagen_url || ''} onUpload={(url) => setEditingProduct({...editingProduct, imagen_url: url})} />
+               <ImageUploader label="Imagen" currentUrl={editingProduct.imagen_url || ''} onUpload={(url) => setEditingProduct({...editingProduct, imagen_url: url})} />
                
                <div className="space-y-1">
-                 <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Nombre / Transportista</label>
-                 <input placeholder="Ej: Picanha Premium o Eco-Carga" className="w-full bg-offwhite p-4 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" value={editingProduct.nombre} onChange={e => setEditingProduct({...editingProduct, nombre: e.target.value})} />
+                 <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Nombre / Empresa</label>
+                 <input placeholder="Ej: Picanha Premium o Transporte El Rayo" className="w-full bg-offwhite p-4 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" value={editingProduct.nombre} onChange={e => setEditingProduct({...editingProduct, nombre: e.target.value})} />
                </div>
 
                <div className="space-y-1 relative">
@@ -367,12 +367,12 @@ const AdminPanel: React.FC<{
                      {generatingAI ? <Loader2 className="animate-spin" size={12} /> : <Wand2 size={12} />} IA Mágica
                    </button>
                  </div>
-                 <textarea placeholder="Describe el producto o vehículo..." className="w-full bg-offwhite p-4 rounded-2xl font-bold h-24 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" value={editingProduct.descripcion} onChange={e => setEditingProduct({...editingProduct, descripcion: e.target.value})} />
+                 <textarea placeholder="Describe el producto o el servicio de transporte..." className="w-full bg-offwhite p-4 rounded-2xl font-bold h-24 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" value={editingProduct.descripcion} onChange={e => setEditingProduct({...editingProduct, descripcion: e.target.value})} />
                </div>
 
                <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-1">
-                   <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Tarifa / Precio ($)</label>
+                   <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Precio / Tarifa ($)</label>
                    <input placeholder="Precio" type="number" step="0.01" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingProduct.precio} onChange={e => setEditingProduct({...editingProduct, precio: parseFloat(e.target.value)})} />
                  </div>
                  <div className="space-y-1">
@@ -389,11 +389,11 @@ const AdminPanel: React.FC<{
                    </select>
                  </div>
                </div>
-
+               
                <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-1">
-                   <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Categoría / Subtipo</label>
-                   <input placeholder="Ej: Carga, Pasajeros, Premium" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingProduct.categoria || ''} onChange={e => setEditingProduct({...editingProduct, categoria: e.target.value})} />
+                    <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Categoría (Carga/Pasajeros)</label>
+                    <input placeholder="Ej: Carga o Aves" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingProduct.categoria || ''} onChange={e => setEditingProduct({...editingProduct, categoria: e.target.value})} />
                  </div>
                  <div className="space-y-1">
                    <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Unidad de Medida</label>
@@ -578,17 +578,15 @@ const ProductCard: React.FC<{ product: Product; tasa: number; onAdd: (p: Product
 
   const safePrecio = Number(product.precio);
   const safeTasa = Number(tasa);
-
-  // Si es un transportista, mostramos un diseño ligeramente diferente
   const isTransport = product.departamento === 'transporte';
 
   return (
-    <div className={`glassmorphism rounded-[2rem] overflow-hidden group hover:-translate-y-1 transition-all duration-300 shadow-sm border border-white flex flex-col h-full ${isTransport ? 'ring-2 ring-accent/20' : ''}`}>
+    <div className={`glassmorphism rounded-[2rem] overflow-hidden group hover:-translate-y-1 transition-all duration-300 shadow-sm border border-white flex flex-col h-full ${isTransport ? 'border-accent/40' : ''}`}>
       <div className="aspect-square relative overflow-hidden bg-white shrink-0">
         <img src={product.imagen_url} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
         <div className="absolute top-3 right-3 flex flex-col gap-1 items-end">
-          <Badge variant={isTransport ? "warning" : "primary"}>{product.unidad}</Badge>
-          {isTransport && <Badge variant="info">{product.categoria}</Badge>}
+            <Badge variant={isTransport ? "warning" : "primary"}>{product.unidad}</Badge>
+            {isTransport && <Badge variant="info">{product.categoria}</Badge>}
         </div>
       </div>
       <div className="p-5 flex flex-col flex-grow">
@@ -686,7 +684,7 @@ const HomeView: React.FC<{
         )) : (
           <div className="col-span-full py-20 text-center">
             <Package className="mx-auto text-primary/10 mb-4" size={64} />
-            <p className="font-bold text-primary/30">No se encontraron registros.</p>
+            <p className="font-bold text-primary/30">No se encontraron productos.</p>
           </div>
         )}
       </div>
@@ -780,19 +778,19 @@ const CheckoutView: React.FC<{
                   {formData.transportistaId === c.id && <CheckCircle2 size={20} className="text-accent" />}
                 </div>
               )) : (
-                <p className="text-center text-[10px] font-black text-primary/30 py-4 uppercase">Cargando transportistas disponibles...</p>
+                <p className="text-center text-[10px] font-black text-primary/30 py-4 uppercase">Cargando transportistas...</p>
               )}
             </div>
             {selectedCarrier && (
               <div className="mt-4 p-4 bg-accent/5 rounded-xl border border-accent/10">
-                <p className="text-[10px] font-medium text-primary/60 italic">"{selectedCarrier.descripcion}"</p>
+                <p className="text-[10px] font-medium text-primary/60 italic leading-snug">"{selectedCarrier.descripcion}"</p>
               </div>
             )}
           </div>
         )}
 
         <div className="glassmorphism p-6 rounded-[2rem] border border-white">
-           <textarea placeholder="¿Alguna nota o requerimiento especial?" className="w-full bg-offwhite p-4 rounded-xl font-bold h-20 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" value={formData.notas} onChange={e => setFormData({...formData, notas: e.target.value})} />
+           <textarea placeholder="Notas adicionales..." className="w-full bg-offwhite p-4 rounded-xl font-bold h-20 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" value={formData.notas} onChange={e => setFormData({...formData, notas: e.target.value})} />
         </div>
 
         <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all active:scale-95 flex items-center justify-center gap-2">
@@ -828,10 +826,10 @@ const App: React.FC = () => {
   useEffect(() => { refreshData(); }, []);
 
   const addToCart = (p: Product) => {
-    // Los transportistas no se añaden al carrito, se eligen en checkout
+    // Si es del depto transporte, informamos al usuario que se selecciona al final
     if (p.departamento === 'transporte') {
-      alert("ℹ️ Los transportistas se eligen al finalizar el pedido si seleccionas 'Delivery'.");
-      return;
+        alert("ℹ️ Los transportistas se seleccionan al finalizar tu pedido si eliges 'Delivery'.");
+        return;
     }
     if (cart.length > 0 && cart[0].departamento !== p.departamento) {
       alert("⚠️ Finaliza tu compra en este departamento antes de cambiar.");
@@ -847,9 +845,10 @@ const App: React.FC = () => {
   const finalizeOrder = async (orderData: any) => {
     if (cart.length === 0) return;
     const safeTasa = Number(config.tasa_cambio);
-    const transportPrice = orderData.transportista ? Number(orderData.transportista.precio) : 0;
-    const totalUSD = cart.reduce((acc, i) => acc + (Number(i.precio) * Number(i.quantity)), 0) + transportPrice;
-    
+    const carrierTarifa = orderData.transportista ? Number(orderData.transportista.precio) : 0;
+    const subtotalUSD = cart.reduce((acc, i) => acc + (Number(i.precio) * Number(i.quantity)), 0);
+    const totalUSD = subtotalUSD + carrierTarifa;
+
     const order: Order = {
       order_id: `JX4-${Date.now()}`,
       nombre_cliente: orderData.nombre || '',
@@ -871,11 +870,13 @@ const App: React.FC = () => {
       setCurrentOrder(order);
       setCart([]);
       setView('success');
-      
+
       const dept = departments.find(d => d.slug === order.departamento);
-      const carrierInfo = orderData.transportista ? `\n\n🚚 *TRANSPORTISTA:* ${orderData.transportista.nombre} ($${transportPrice.toFixed(2)})\n📑 *Tipo:* ${orderData.transportista.categoria}` : '';
-      
-      const text = `🛒 *NUEVO PEDIDO JX4*\n--------------------\n👤 *Cliente:* ${order.nombre_cliente.toUpperCase()}\n📞 *WhatsApp:* ${order.telefono_cliente}\n📦 *Método:* ${order.metodo_entrega.toUpperCase()}${carrierInfo}\n\n📦 *PRODUCTOS:*\n${order.productos.map(p => `- ${p.nombre} x${p.quantity} ($${(Number(p.precio) * Number(p.quantity)).toFixed(2)})`).join('\n')}\n\n💵 *SUBTOTAL:* $${(totalUSD - transportPrice).toFixed(2)}\n💰 *TOTAL FINAL:* $${totalUSD.toFixed(2)}\n🇻🇪 *TOTAL BS:* Bs. ${order.total_bs.toLocaleString('es-VE')}\n\n📍 *Dirección:* ${order.direccion}\n📝 *Notas:* ${order.notas || 'Sin notas.'}`;
+      const transportLine = orderData.transportista 
+        ? `\n\n🚚 *DELIVERY:* ${orderData.transportista.nombre} ($${carrierTarifa.toFixed(2)})\n📑 *Tipo:* ${orderData.transportista.categoria}` 
+        : '\n\n🏪 *ENTREGA:* Retiro Personal';
+
+      const text = `🛒 *NUEVO PEDIDO JX4*\n--------------------\n👤 *Cliente:* ${order.nombre_cliente.toUpperCase()}\n📞 *WhatsApp:* ${order.telefono_cliente}${transportLine}\n\n📦 *PRODUCTOS:*\n${order.productos.map(p => `- ${p.nombre} x${p.quantity} ($${(Number(p.precio) * Number(p.quantity)).toFixed(2)})`).join('\n')}\n\n💵 *SUBTOTAL:* $${subtotalUSD.toFixed(2)}\n💰 *TOTAL FINAL:* $${totalUSD.toFixed(2)}\n🇻🇪 *TOTAL BS:* Bs. ${order.total_bs.toLocaleString('es-VE')}\n\n📍 *Dirección:* ${order.direccion}\n📝 *Notas:* ${order.notas || 'Sin notas.'}`;
       
       window.open(`https://wa.me/${dept?.telefono_whatsapp || config.whatsapp_general}?text=${encodeURIComponent(text)}`, '_blank');
     } catch (e: any) { alert("Error al guardar: " + e.message); }
