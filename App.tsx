@@ -1,15 +1,15 @@
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { 
   ShoppingBag, Plus, Minus, Trash2, ArrowRight, CheckCircle2, 
   Search, Package, Settings, Upload, LogIn, LogOut,
   Save, X, Edit3, Loader2, RefreshCcw, 
   ShieldAlert, Users, Lock, UserPlus, Home, MessageCircle, Sparkles, 
-  AlertCircle, Scale, ShieldCheck, FileText, Info, Wand2, Truck, User, Car
+  AlertCircle, Scale, ShieldCheck, FileText, Info, Wand2, Truck, User, Car, ChevronLeft
 } from 'lucide-react';
 
-import { Product, CartItem, DepartmentSlug, Order, Config, Department, UnidadMedida, AdminUser } from './types';
+import { Product, CartItem, DepartmentSlug, Order, Order, Config, Department, UnidadMedida, AdminUser } from './types';
 import { db, uploadImage } from './services/supabaseService';
 import { generateProductDescription, getCookingTip } from './services/geminiService';
 
@@ -35,6 +35,7 @@ const UNIDADES: { value: UnidadMedida; label: string }[] = [
   { value: 'viaje' as any, label: 'Por Viaje' },
 ];
 
+// Fix: Add React to scope to support React.FC and React.ReactNode namespaces
 const Badge: React.FC<{ children: React.ReactNode; variant?: 'success' | 'warning' | 'error' | 'info' | 'primary' }> = ({ children, variant = 'primary' }) => {
   const styles = {
     primary: 'bg-primary/10 text-primary border-primary/20',
@@ -46,6 +47,7 @@ const Badge: React.FC<{ children: React.ReactNode; variant?: 'success' | 'warnin
   return <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border uppercase ${styles[variant]}`}>{children}</span>;
 };
 
+// Fix: Missing React namespace resolved via import
 const PoliciesView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   return (
     <div className="px-6 py-10 max-w-3xl mx-auto animate-fade-in pb-40">
@@ -106,6 +108,7 @@ const PoliciesView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   );
 };
 
+// Fix: Missing React namespace resolved via import
 const ImageUploader: React.FC<{ 
   currentUrl: string; 
   onUpload: (url: string) => void;
@@ -114,6 +117,7 @@ const ImageUploader: React.FC<{
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Fix: Correct typing for event handler using React namespace
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -160,6 +164,7 @@ const ImageUploader: React.FC<{
   );
 };
 
+// Fix: Missing React namespace resolved via import
 const AdminPanel: React.FC<{
   currentUser: AdminUser;
   products: Product[];
@@ -562,6 +567,7 @@ const AdminPanel: React.FC<{
   );
 };
 
+// Fix: Missing React namespace resolved via import
 const ProductCard: React.FC<{ product: Product; tasa: number; onAdd: (p: Product) => void }> = ({ product, tasa, onAdd }) => {
   const [tip, setTip] = useState<string | null>(null);
   const [loadingTip, setLoadingTip] = useState(false);
@@ -581,7 +587,7 @@ const ProductCard: React.FC<{ product: Product; tasa: number; onAdd: (p: Product
   const isTransport = product.departamento === 'transporte';
 
   return (
-    <div className={`glassmorphism rounded-[2rem] overflow-hidden group hover:-translate-y-1 transition-all duration-300 shadow-sm border border-white flex flex-col h-full ${isTransport ? 'border-accent/40' : ''}`}>
+    <div className={`glassmorphism rounded-[2rem] overflow-hidden group hover:-translate-y-1 transition-all duration-300 shadow-sm border border-white flex flex-col h-full ${isTransport ? 'border-accent/40 ring-1 ring-accent/5' : ''}`}>
       <div className="aspect-square relative overflow-hidden bg-white shrink-0">
         <img src={product.imagen_url} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
         <div className="absolute top-3 right-3 flex flex-col gap-1 items-end">
@@ -619,15 +625,80 @@ const ProductCard: React.FC<{ product: Product; tasa: number; onAdd: (p: Product
             <div className="text-xl font-black text-primary">${safePrecio.toFixed(2)}</div>
             <div className="text-[10px] font-bold text-primary/30">Bs. {(safePrecio * safeTasa).toFixed(2)}</div>
           </div>
-          <button onClick={() => onAdd(product)} className="bg-primary text-white p-3 rounded-2xl hover:bg-accent transition-all shadow-lg active:scale-95">
-            <Plus size={20} />
-          </button>
+          {!isTransport && (
+            <button onClick={() => onAdd(product)} className="bg-primary text-white p-3 rounded-2xl hover:bg-accent transition-all shadow-lg active:scale-95">
+                <Plus size={20} />
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
+// Fix: Missing React namespace resolved via import
+const TransportView: React.FC<{
+  products: Product[];
+  config: Config;
+  onBack: () => void;
+}> = ({ products, config, onBack }) => {
+  const [category, setCategory] = useState<'all' | string>('all');
+  const transportItems = products.filter(p => p.departamento === 'transporte' && p.disponible);
+  
+  const categories = useMemo(() => {
+    const cats = new Set(transportItems.map(p => p.categoria).filter(Boolean));
+    return Array.from(cats);
+  }, [transportItems]);
+
+  const filtered = transportItems.filter(p => category === 'all' || p.categoria === category);
+
+  return (
+    <div className="px-6 py-10 animate-fade-in pb-40 max-w-7xl mx-auto">
+       <button onClick={onBack} className="flex items-center gap-2 text-primary/40 font-bold mb-8 hover:text-primary transition-colors">
+        <ChevronLeft size={20} /> Volver a la tienda
+      </button>
+
+      <div className="text-center mb-10">
+        <div className="bg-accent/10 w-20 h-20 rounded-[2rem] mx-auto flex items-center justify-center text-accent mb-4 shadow-inner">
+            <Truck size={40} />
+        </div>
+        <h2 className="text-4xl font-black text-primary tracking-tighter">Servicios de Transporte</h2>
+        <p className="text-primary/50 font-medium">Carga, encomiendas y traslados ejecutivos</p>
+      </div>
+
+      <div className="flex gap-3 mb-8 overflow-x-auto hide-scrollbar justify-center">
+         <button onClick={() => setCategory('all')} className={`px-6 py-3 rounded-2xl font-bold text-xs transition-all uppercase tracking-widest ${category === 'all' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'bg-white text-primary/40 border border-primary/5'}`}>Todos</button>
+         {categories.map(cat => (
+           <button key={cat} onClick={() => setCategory(cat)} className={`px-6 py-3 rounded-2xl font-bold text-xs transition-all uppercase tracking-widest ${category === cat ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'bg-white text-primary/40 border border-primary/5'}`}>{cat}</button>
+         ))}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {filtered.map(p => (
+           <ProductCard key={p.id} product={p} tasa={config.tasa_cambio} onAdd={() => {}} />
+        ))}
+        {filtered.length === 0 && (
+          <div className="col-span-full py-20 text-center opacity-20 flex flex-col items-center">
+             <Package size={64} className="mb-4" />
+             <p className="font-black uppercase tracking-widest">No hay transportistas registrados</p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-12 glassmorphism p-8 rounded-[2.5rem] border border-white text-center">
+         <p className="text-xs font-bold text-primary/60 mb-2">¿Necesitas contratar un servicio específico ahora mismo?</p>
+         <button 
+           onClick={() => window.open(`https://wa.me/${config.whatsapp_general}?text=${encodeURIComponent("Hola, necesito contratar un servicio de transporte.")}`, '_blank')}
+           className="bg-primary text-white px-8 py-4 rounded-2xl font-black shadow-xl hover:bg-accent transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto"
+         >
+           <MessageCircle size={18} /> Contactar Central
+         </button>
+      </div>
+    </div>
+  );
+};
+
+// Fix: Missing React namespace resolved via import
 const HomeView: React.FC<{ 
   products: Product[];
   departments: Department[];
@@ -637,8 +708,16 @@ const HomeView: React.FC<{
   const [selectedDept, setSelectedDept] = useState<string | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Filtrar depts para no mostrar transporte en el scrollbar
+  const visibleDepartments = departments.filter(d => d.slug !== 'transporte');
+
   const filtered = useMemo(() => {
-    return products.filter(p => (selectedDept === 'all' || p.departamento === selectedDept) && p.nombre.toLowerCase().includes(searchQuery.toLowerCase()));
+    return products.filter(p => 
+      // Ocultar transporte de la vista principal "Todos" y categorías
+      p.departamento !== 'transporte' && 
+      (selectedDept === 'all' || p.departamento === selectedDept) && 
+      p.nombre.toLowerCase().includes(searchQuery.toLowerCase())
+    );
   }, [products, selectedDept, searchQuery]);
 
   return (
@@ -670,7 +749,7 @@ const HomeView: React.FC<{
 
       <div className="px-6 mb-8 overflow-x-auto hide-scrollbar flex gap-3">
         <button onClick={() => setSelectedDept('all')} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all whitespace-nowrap ${selectedDept === 'all' ? 'bg-primary text-white shadow-lg' : 'bg-white text-primary/40 border border-primary/5'}`}>Todos</button>
-        {departments.map(d => (
+        {visibleDepartments.map(d => (
           <button key={d.id} onClick={() => setSelectedDept(d.slug)} className={`px-6 py-3 rounded-2xl font-bold text-sm transition-all whitespace-nowrap flex items-center gap-2 ${selectedDept === d.slug ? 'bg-primary text-white shadow-lg' : 'bg-white text-primary/40 border border-primary/5'}`}>
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color_hex }}></span>
             {d.nombre}
@@ -692,6 +771,7 @@ const HomeView: React.FC<{
   );
 };
 
+// Fix: Missing React namespace resolved via import
 const CheckoutView: React.FC<{
   carriers: Product[];
   onFinalize: (data: any) => void;
@@ -801,6 +881,7 @@ const CheckoutView: React.FC<{
   );
 };
 
+// Fix: Missing React namespace resolved via import
 const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -809,7 +890,7 @@ const App: React.FC = () => {
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [view, setView] = useState<'home' | 'cart' | 'checkout' | 'success' | 'admin' | 'login' | 'policies'>('home');
+  const [view, setView] = useState<'home' | 'cart' | 'checkout' | 'success' | 'admin' | 'login' | 'policies' | 'transport'>('home');
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
 
@@ -892,6 +973,7 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-offwhite pb-32 flex flex-col">
         <main className="max-w-7xl mx-auto w-full flex-grow">
           {view === 'home' && <HomeView products={products} departments={departments} onAddToCart={addToCart} config={config} />}
+          {view === 'transport' && <TransportView products={products} config={config} onBack={() => setView('home')} />}
           {view === 'policies' && <PoliciesView onBack={() => setView('home')} />}
           {view === 'admin' && currentUser && <AdminPanel currentUser={currentUser} products={products} departments={departments} config={config} onRefresh={refreshData} onLogout={() => { setCurrentUser(null); setView('home'); }} />}
           {view === 'login' && (
@@ -971,13 +1053,24 @@ const App: React.FC = () => {
           <button onClick={() => setView('policies')} className="mt-2 text-[9px] font-black text-accent uppercase hover:underline">Ver Políticas Completas</button>
         </footer>
 
-        <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md glassmorphism rounded-full px-10 py-5 flex items-center justify-between shadow-2xl z-50 border border-white/40">
-          <button onClick={() => setView('home')} className={`p-2 transition-all hover:scale-110 active:scale-90 ${view === 'home' ? 'text-accent scale-125' : 'text-primary/30'}`}><Home size={28} /></button>
-          <button onClick={() => setView('cart')} className={`p-2 relative transition-all hover:scale-110 active:scale-90 ${view === 'cart' ? 'text-accent scale-125' : 'text-primary/30'}`}>
-            <ShoppingBag size={28} />
-            {totalCartItems > 0 && <span className="absolute -top-1 -right-1 bg-accent text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-lg">{totalCartItems}</span>}
+        <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[95%] max-w-md glassmorphism rounded-full px-8 py-5 flex items-center justify-between shadow-2xl z-50 border border-white/40">
+          <button onClick={() => setView('home')} className={`p-2 transition-all hover:scale-110 active:scale-90 flex flex-col items-center gap-1 ${view === 'home' ? 'text-accent scale-110' : 'text-primary/30'}`}>
+            <Home size={24} />
+            <span className="text-[8px] font-black uppercase">Inicio</span>
           </button>
-          <button onClick={() => currentUser ? setView('admin') : setView('login')} className={`p-2 transition-all hover:scale-110 active:scale-90 ${view === 'admin' || view === 'login' ? 'text-accent scale-125' : 'text-primary/30'}`}><Settings size={28} /></button>
+          <button onClick={() => setView('cart')} className={`p-2 relative transition-all hover:scale-110 active:scale-90 flex flex-col items-center gap-1 ${view === 'cart' ? 'text-accent scale-110' : 'text-primary/30'}`}>
+            <ShoppingBag size={24} />
+            {totalCartItems > 0 && <span className="absolute -top-1 -right-1 bg-accent text-white text-[8px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-lg">{totalCartItems}</span>}
+            <span className="text-[8px] font-black uppercase">Carrito</span>
+          </button>
+          <button onClick={() => setView('transport')} className={`p-2 transition-all hover:scale-110 active:scale-90 flex flex-col items-center gap-1 ${view === 'transport' ? 'text-accent scale-110' : 'text-primary/30'}`}>
+            <Truck size={24} />
+            <span className="text-[8px] font-black uppercase">Transporte</span>
+          </button>
+          <button onClick={() => currentUser ? setView('admin') : setView('login')} className={`p-2 transition-all hover:scale-110 active:scale-90 flex flex-col items-center gap-1 ${view === 'admin' || view === 'login' ? 'text-accent scale-110' : 'text-primary/30'}`}>
+            <Settings size={24} />
+            <span className="text-[8px] font-black uppercase">Gestión</span>
+          </button>
         </nav>
       </div>
     </HashRouter>
