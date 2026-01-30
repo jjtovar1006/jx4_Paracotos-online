@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Beef, Bird, Sandwich, Fish } from 'lucide-react';
+import { Beef, Bird, Sandwich, Fish, Truck } from 'lucide-react';
 import { DepartmentSlug } from './types';
 
 export const DEPARTMENTS: { slug: DepartmentSlug; name: string; icon: React.ReactNode; color: string }[] = [
@@ -8,6 +8,7 @@ export const DEPARTMENTS: { slug: DepartmentSlug; name: string; icon: React.Reac
   { slug: 'aves', name: 'Aves', icon: <Bird size={24} />, color: '#f59e0b' },
   { slug: 'embutidos', name: 'Embutidos', icon: <Sandwich size={24} />, color: '#10b981' },
   { slug: 'pescados', name: 'Pescados', icon: <Fish size={24} />, color: '#3b82f6' },
+  { slug: 'transporte', name: 'Transporte', icon: <Truck size={24} />, color: '#3b82f6' },
 ];
 
 export const APP_CONFIG_DEFAULT = {

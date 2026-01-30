@@ -6,7 +6,7 @@ import {
   Search, Package, Settings, Upload, LogIn, LogOut,
   Save, X, Edit3, Loader2, RefreshCcw, 
   ShieldAlert, Users, Lock, UserPlus, Home, MessageCircle, Sparkles, 
-  AlertCircle, Scale, ShieldCheck, FileText, Info, Wand2
+  AlertCircle, Scale, ShieldCheck, FileText, Info, Wand2, Truck, Car, User
 } from 'lucide-react';
 
 import { Product, CartItem, DepartmentSlug, Order, Config, Department, UnidadMedida, AdminUser } from './types';
@@ -32,6 +32,7 @@ const UNIDADES: { value: UnidadMedida; label: string }[] = [
   { value: 'metro', label: 'Metro' },
   { value: 'litro', label: 'Litro' },
   { value: 'docena', label: 'Docena' },
+  { value: 'viaje' as any, label: 'Por Viaje' },
 ];
 
 const Badge: React.FC<{ children: React.ReactNode; variant?: 'success' | 'warning' | 'error' | 'info' | 'primary' }> = ({ children, variant = 'primary' }) => {
@@ -351,13 +352,13 @@ const AdminPanel: React.FC<{
                <ImageUploader label="Imagen del Producto" currentUrl={editingProduct.imagen_url || ''} onUpload={(url) => setEditingProduct({...editingProduct, imagen_url: url})} />
                
                <div className="space-y-1">
-                 <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Nombre del Producto</label>
-                 <input placeholder="Ej: Picanha Premium" className="w-full bg-offwhite p-4 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" value={editingProduct.nombre} onChange={e => setEditingProduct({...editingProduct, nombre: e.target.value})} />
+                 <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Nombre / Transportista</label>
+                 <input placeholder="Ej: Picanha Premium o Eco-Carga" className="w-full bg-offwhite p-4 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" value={editingProduct.nombre} onChange={e => setEditingProduct({...editingProduct, nombre: e.target.value})} />
                </div>
 
                <div className="space-y-1 relative">
                  <div className="flex justify-between items-center pr-2">
-                   <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Descripción</label>
+                   <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Descripción / Vehículo</label>
                    <button 
                     disabled={generatingAI}
                     onClick={handleGenerateDescription}
@@ -366,12 +367,12 @@ const AdminPanel: React.FC<{
                      {generatingAI ? <Loader2 className="animate-spin" size={12} /> : <Wand2 size={12} />} IA Mágica
                    </button>
                  </div>
-                 <textarea placeholder="Describe el producto..." className="w-full bg-offwhite p-4 rounded-2xl font-bold h-24 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" value={editingProduct.descripcion} onChange={e => setEditingProduct({...editingProduct, descripcion: e.target.value})} />
+                 <textarea placeholder="Describe el producto o vehículo..." className="w-full bg-offwhite p-4 rounded-2xl font-bold h-24 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" value={editingProduct.descripcion} onChange={e => setEditingProduct({...editingProduct, descripcion: e.target.value})} />
                </div>
 
                <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-1">
-                   <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Precio ($)</label>
+                   <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Tarifa / Precio ($)</label>
                    <input placeholder="Precio" type="number" step="0.01" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingProduct.precio} onChange={e => setEditingProduct({...editingProduct, precio: parseFloat(e.target.value)})} />
                  </div>
                  <div className="space-y-1">
@@ -388,16 +389,22 @@ const AdminPanel: React.FC<{
                    </select>
                  </div>
                </div>
-               
-               <div className="space-y-1">
-                 <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Unidad de Medida</label>
-                 <select className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingProduct.unidad} onChange={e => setEditingProduct({...editingProduct, unidad: e.target.value as any})}>
-                   {UNIDADES.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-                 </select>
+
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-1">
+                   <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Categoría / Subtipo</label>
+                   <input placeholder="Ej: Carga, Pasajeros, Premium" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingProduct.categoria || ''} onChange={e => setEditingProduct({...editingProduct, categoria: e.target.value})} />
+                 </div>
+                 <div className="space-y-1">
+                   <label className="text-[10px] font-black uppercase text-primary/30 ml-2">Unidad de Medida</label>
+                   <select className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none" value={editingProduct.unidad} onChange={e => setEditingProduct({...editingProduct, unidad: e.target.value as any})}>
+                     {UNIDADES.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                   </select>
+                 </div>
                </div>
 
                <button onClick={handleSaveProduct} disabled={saving} className="w-full bg-primary text-white py-5 rounded-2xl font-black shadow-xl transition-all active:scale-95 flex items-center justify-center">
-                 {saving ? <Loader2 className="animate-spin" /> : "Guardar Producto"}
+                 {saving ? <Loader2 className="animate-spin" /> : "Guardar Registro"}
                </button>
              </div>
           </div>
@@ -426,7 +433,7 @@ const AdminPanel: React.FC<{
 
       {editingDept && (
         <div className="fixed inset-0 z-[100] bg-primary/40 backdrop-blur-md flex items-center justify-center p-6 overflow-y-auto">
-          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 shadow-2xl animate-in slide-in-from-bottom-10 my-auto">
+          <div className="bg-white w-full max-md rounded-[3rem] p-10 shadow-2xl animate-in slide-in-from-bottom-10 my-auto">
              <div className="flex justify-between items-center mb-6">
                <h3 className="text-2xl font-black text-primary">Gestionar Departamento</h3>
                <button onClick={() => setEditingDept(null)}><X /></button>
@@ -572,22 +579,32 @@ const ProductCard: React.FC<{ product: Product; tasa: number; onAdd: (p: Product
   const safePrecio = Number(product.precio);
   const safeTasa = Number(tasa);
 
+  // Si es un transportista, mostramos un diseño ligeramente diferente
+  const isTransport = product.departamento === 'transporte';
+
   return (
-    <div className="glassmorphism rounded-[2rem] overflow-hidden group hover:-translate-y-1 transition-all duration-300 shadow-sm border border-white flex flex-col h-full">
+    <div className={`glassmorphism rounded-[2rem] overflow-hidden group hover:-translate-y-1 transition-all duration-300 shadow-sm border border-white flex flex-col h-full ${isTransport ? 'ring-2 ring-accent/20' : ''}`}>
       <div className="aspect-square relative overflow-hidden bg-white shrink-0">
         <img src={product.imagen_url} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
-        <div className="absolute top-3 right-3"><Badge variant="primary">{product.unidad}</Badge></div>
+        <div className="absolute top-3 right-3 flex flex-col gap-1 items-end">
+          <Badge variant={isTransport ? "warning" : "primary"}>{product.unidad}</Badge>
+          {isTransport && <Badge variant="info">{product.categoria}</Badge>}
+        </div>
       </div>
       <div className="p-5 flex flex-col flex-grow">
         <div className="flex justify-between items-start mb-1 gap-2">
-          <h3 className="font-bold text-lg leading-tight">{product.nombre}</h3>
-          <button 
-            onClick={fetchTip}
-            title="Sugerencia IA"
-            className="p-1.5 rounded-full bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all shrink-0"
-          >
-            {loadingTip ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />}
-          </button>
+          <h3 className="font-bold text-lg leading-tight flex items-center gap-2">
+            {isTransport && <Truck size={16} className="text-accent" />}
+            {product.nombre}
+          </h3>
+          {!isTransport && (
+            <button 
+              onClick={fetchTip}
+              className="p-1.5 rounded-full bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all shrink-0"
+            >
+              {loadingTip ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />}
+            </button>
+          )}
         </div>
         
         {tip && (
@@ -669,7 +686,7 @@ const HomeView: React.FC<{
         )) : (
           <div className="col-span-full py-20 text-center">
             <Package className="mx-auto text-primary/10 mb-4" size={64} />
-            <p className="font-bold text-primary/30">No se encontraron productos.</p>
+            <p className="font-bold text-primary/30">No se encontraron registros.</p>
           </div>
         )}
       </div>
@@ -678,14 +695,16 @@ const HomeView: React.FC<{
 };
 
 const CheckoutView: React.FC<{
-  onFinalize: (data: Partial<Order>) => void;
-}> = ({ onFinalize }) => {
+  carriers: Product[];
+  onFinalize: (data: any) => void;
+}> = ({ carriers, onFinalize }) => {
   const [formData, setFormData] = useState({
     nombre: '',
     telefono: '',
     direccion: '',
     entrega: 'retiro',
-    notas: ''
+    notas: '',
+    transportistaId: ''
   });
   const [searching, setSearching] = useState(false);
   const [found, setFound] = useState(false);
@@ -709,17 +728,16 @@ const CheckoutView: React.FC<{
     }
   };
 
+  const selectedCarrier = carriers.find(c => c.id === formData.transportistaId);
+
   return (
     <div className="px-6 py-20 max-w-xl mx-auto animate-fade-in">
-      <h2 className="text-3xl font-black mb-8 text-primary text-center">Datos de Envío</h2>
+      <h2 className="text-3xl font-black mb-8 text-primary text-center tracking-tighter">Finalizar Pedido</h2>
       <form onSubmit={(e) => {
         e.preventDefault();
         onFinalize({
-          nombre_cliente: formData.nombre,
-          telefono_cliente: formData.telefono,
-          direccion: formData.direccion,
-          metodo_entrega: formData.entrega as any,
-          notas: formData.notas
+          ...formData,
+          transportista: selectedCarrier
         });
       }} className="space-y-6">
         <div className="glassmorphism p-6 rounded-[2rem] space-y-4 border border-white relative">
@@ -729,17 +747,57 @@ const CheckoutView: React.FC<{
             {found && <div className="absolute -top-3 left-4 bg-accent text-white text-[9px] font-black px-2 py-1 rounded-full flex items-center gap-1 animate-bounce"><Sparkles size={10} /> ¡CLIENTE FRECUENTE!</div>}
           </div>
           <input required placeholder="Nombre Completo" className="w-full bg-offwhite p-4 rounded-xl font-bold outline-none border-2 border-transparent focus:border-accent transition-all" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
-          <textarea required placeholder="Dirección para la entrega" className="w-full bg-offwhite p-4 rounded-xl font-bold h-24 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} />
-          <textarea placeholder="Notas adicionales..." className="w-full bg-offwhite p-4 rounded-xl font-bold h-20 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" value={formData.notas} onChange={e => setFormData({...formData, notas: e.target.value})} />
+          <textarea required placeholder="Dirección exacta para la entrega" className="w-full bg-offwhite p-4 rounded-xl font-bold h-24 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} />
         </div>
-        <div className="glassmorphism p-6 rounded-[2rem] border border-white text-center">
-          <h3 className="text-xs font-black uppercase text-primary/30 mb-4 tracking-widest">Método de Entrega</h3>
+        
+        <div className="glassmorphism p-6 rounded-[2rem] border border-white">
+          <h3 className="text-xs font-black uppercase text-primary/30 mb-4 tracking-widest text-center">Tipo de Entrega</h3>
           <div className="grid grid-cols-2 gap-4">
-            <button type="button" onClick={() => setFormData({...formData, entrega: 'retiro'})} className={`p-4 rounded-xl font-bold transition-all border-2 ${formData.entrega === 'retiro' ? 'bg-white border-accent' : 'bg-offwhite border-transparent'}`}>Retiro en Tienda</button>
-            <button type="button" onClick={() => setFormData({...formData, entrega: 'delivery'})} className={`p-4 rounded-xl font-bold transition-all border-2 ${formData.entrega === 'delivery' ? 'bg-white border-accent' : 'bg-offwhite border-transparent'}`}>Delivery</button>
+            <button type="button" onClick={() => setFormData({...formData, entrega: 'retiro', transportistaId: ''})} className={`p-4 rounded-xl font-bold transition-all border-2 flex flex-col items-center gap-2 ${formData.entrega === 'retiro' ? 'bg-white border-accent text-primary' : 'bg-offwhite border-transparent text-primary/30'}`}>
+              <User size={20} /> Retiro Personal
+            </button>
+            <button type="button" onClick={() => setFormData({...formData, entrega: 'delivery'})} className={`p-4 rounded-xl font-bold transition-all border-2 flex flex-col items-center gap-2 ${formData.entrega === 'delivery' ? 'bg-white border-accent text-primary' : 'bg-offwhite border-transparent text-primary/30'}`}>
+              <Truck size={20} /> Delivery JX4
+            </button>
           </div>
         </div>
-        <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all active:scale-95">Finalizar Pedido</button>
+
+        {formData.entrega === 'delivery' && (
+          <div className="glassmorphism p-6 rounded-[2rem] border border-white animate-in slide-in-from-top-4">
+            <h3 className="text-xs font-black uppercase text-accent mb-4 tracking-widest text-center">Selecciona tu Transportista</h3>
+            <div className="grid grid-cols-1 gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+              {carriers.length > 0 ? carriers.map(c => (
+                <div 
+                  key={c.id} 
+                  onClick={() => setFormData({...formData, transportistaId: c.id || ''})}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-4 ${formData.transportistaId === c.id ? 'bg-white border-accent shadow-lg shadow-accent/10' : 'bg-offwhite border-transparent'}`}
+                >
+                  <img src={c.imagen_url} className="w-12 h-12 rounded-xl object-cover" />
+                  <div className="flex-1">
+                    <p className="font-bold text-sm text-primary leading-none mb-1">{c.nombre}</p>
+                    <p className="text-[10px] font-black text-accent uppercase">{c.categoria} • ${Number(c.precio).toFixed(2)}</p>
+                  </div>
+                  {formData.transportistaId === c.id && <CheckCircle2 size={20} className="text-accent" />}
+                </div>
+              )) : (
+                <p className="text-center text-[10px] font-black text-primary/30 py-4 uppercase">Cargando transportistas disponibles...</p>
+              )}
+            </div>
+            {selectedCarrier && (
+              <div className="mt-4 p-4 bg-accent/5 rounded-xl border border-accent/10">
+                <p className="text-[10px] font-medium text-primary/60 italic">"{selectedCarrier.descripcion}"</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="glassmorphism p-6 rounded-[2rem] border border-white">
+           <textarea placeholder="¿Alguna nota o requerimiento especial?" className="w-full bg-offwhite p-4 rounded-xl font-bold h-20 outline-none resize-none border-2 border-transparent focus:border-accent transition-all" value={formData.notas} onChange={e => setFormData({...formData, notas: e.target.value})} />
+        </div>
+
+        <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-accent transition-all active:scale-95 flex items-center justify-center gap-2">
+          Finalizar y Enviar a WhatsApp <ArrowRight size={20} />
+        </button>
       </form>
     </div>
   );
@@ -770,6 +828,11 @@ const App: React.FC = () => {
   useEffect(() => { refreshData(); }, []);
 
   const addToCart = (p: Product) => {
+    // Los transportistas no se añaden al carrito, se eligen en checkout
+    if (p.departamento === 'transporte') {
+      alert("ℹ️ Los transportistas se eligen al finalizar el pedido si seleccionas 'Delivery'.");
+      return;
+    }
     if (cart.length > 0 && cart[0].departamento !== p.departamento) {
       alert("⚠️ Finaliza tu compra en este departamento antes de cambiar.");
       return;
@@ -781,37 +844,45 @@ const App: React.FC = () => {
     });
   };
 
-  const finalizeOrder = async (orderData: Partial<Order>) => {
+  const finalizeOrder = async (orderData: any) => {
     if (cart.length === 0) return;
     const safeTasa = Number(config.tasa_cambio);
-    const totalUSD = cart.reduce((acc, i) => acc + (Number(i.precio) * Number(i.quantity)), 0);
+    const transportPrice = orderData.transportista ? Number(orderData.transportista.precio) : 0;
+    const totalUSD = cart.reduce((acc, i) => acc + (Number(i.precio) * Number(i.quantity)), 0) + transportPrice;
+    
     const order: Order = {
       order_id: `JX4-${Date.now()}`,
-      nombre_cliente: orderData.nombre_cliente || '',
-      telefono_cliente: orderData.telefono_cliente || '',
+      nombre_cliente: orderData.nombre || '',
+      telefono_cliente: orderData.telefono || '',
       direccion: orderData.direccion || '',
       productos: cart,
       total: totalUSD,
       total_bs: totalUSD * safeTasa,
       metodo_pago: 'pago_movil',
-      metodo_entrega: orderData.metodo_entrega || 'retiro',
+      metodo_entrega: orderData.entrega || 'retiro',
       estado: 'pendiente',
       departamento: cart[0].departamento,
       fecha_pedido: new Date().toISOString(),
       notas: orderData.notas
     };
+
     try {
       await db.saveOrder(order);
       setCurrentOrder(order);
       setCart([]);
       setView('success');
+      
       const dept = departments.find(d => d.slug === order.departamento);
-      const text = `🛒 *NUEVO PEDIDO JX4*\n--------------------\n👤 *Cliente:* ${order.nombre_cliente.toUpperCase()}\n📞 *WhatsApp:* ${order.telefono_cliente}\n🚚 *Método:* ${order.metodo_entrega}\n\n📦 *PRODUCTOS:*\n${order.productos.map(p => `- ${p.nombre} x${p.quantity} ($${(Number(p.precio) * Number(p.quantity)).toFixed(2)})`).join('\n')}\n\n💵 *TOTAL USD:* $${order.total.toFixed(2)}\n💰 *TOTAL BS:* Bs. ${order.total_bs.toLocaleString('es-VE')}\n\n📍 *Dirección:* ${order.direccion}\n📝 *Notas:* ${order.notas || 'Sin notas.'}`;
+      const carrierInfo = orderData.transportista ? `\n\n🚚 *TRANSPORTISTA:* ${orderData.transportista.nombre} ($${transportPrice.toFixed(2)})\n📑 *Tipo:* ${orderData.transportista.categoria}` : '';
+      
+      const text = `🛒 *NUEVO PEDIDO JX4*\n--------------------\n👤 *Cliente:* ${order.nombre_cliente.toUpperCase()}\n📞 *WhatsApp:* ${order.telefono_cliente}\n📦 *Método:* ${order.metodo_entrega.toUpperCase()}${carrierInfo}\n\n📦 *PRODUCTOS:*\n${order.productos.map(p => `- ${p.nombre} x${p.quantity} ($${(Number(p.precio) * Number(p.quantity)).toFixed(2)})`).join('\n')}\n\n💵 *SUBTOTAL:* $${(totalUSD - transportPrice).toFixed(2)}\n💰 *TOTAL FINAL:* $${totalUSD.toFixed(2)}\n🇻🇪 *TOTAL BS:* Bs. ${order.total_bs.toLocaleString('es-VE')}\n\n📍 *Dirección:* ${order.direccion}\n📝 *Notas:* ${order.notas || 'Sin notas.'}`;
+      
       window.open(`https://wa.me/${dept?.telefono_whatsapp || config.whatsapp_general}?text=${encodeURIComponent(text)}`, '_blank');
     } catch (e: any) { alert("Error al guardar: " + e.message); }
   };
 
   const totalCartItems = cart.reduce((acc, i) => acc + i.quantity, 0);
+  const carriers = products.filter(p => p.departamento === 'transporte' && p.disponible);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-offwhite"><Loader2 className="animate-spin text-primary" size={64} /></div>;
 
@@ -838,7 +909,7 @@ const App: React.FC = () => {
                  }} className="glassmorphism p-10 rounded-[3rem] space-y-8 shadow-2xl border border-white">
                    <div className="text-center">
                       <div className="bg-primary w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-white mb-6"><LogIn size={32} /></div>
-                      <h2 className="text-3xl font-black text-primary">Acceso Gestión</h2>
+                      <h2 className="text-3xl font-black text-primary tracking-tighter">Acceso Gestión</h2>
                    </div>
                    {loginError && <div className="bg-red-50 p-4 rounded-2xl flex items-start gap-3 text-red-600 font-bold text-xs"><AlertCircle size={20} />{loginError}</div>}
                    <div className="space-y-4">
@@ -853,16 +924,16 @@ const App: React.FC = () => {
           )}
           {view === 'cart' && (
              <div className="px-6 py-20 max-w-2xl mx-auto animate-fade-in">
-                <h2 className="text-4xl font-black mb-10 text-primary">Tu Carrito</h2>
+                <h2 className="text-4xl font-black mb-10 text-primary tracking-tighter">Tu Carrito</h2>
                 {cart.length === 0 ? (
-                  <div className="text-center py-20"><ShoppingBag className="mx-auto text-primary/5 mb-4" size={80} /><p className="text-primary/20 font-black">Carrito vacío.</p></div>
+                  <div className="text-center py-20"><ShoppingBag className="mx-auto text-primary/5 mb-4" size={80} /><p className="text-primary/20 font-black uppercase text-xs">El carrito está vacío</p></div>
                 ) : (
                   <div className="space-y-4">
                      {cart.map(i => (
                        <div key={i.id} className="glassmorphism p-4 rounded-[2rem] flex items-center gap-4 border border-white">
                          <img src={i.imagen_url} className="w-20 h-20 rounded-2xl object-cover bg-white" />
                          <div className="flex-1">
-                           <h4 className="font-bold text-primary">{i.nombre}</h4>
+                           <h4 className="font-bold text-primary leading-tight">{i.nombre}</h4>
                            <p className="text-xs text-primary/40 font-bold">${Number(i.precio).toFixed(2)}</p>
                          </div>
                          <div className="flex flex-col items-center gap-1 bg-offwhite p-1 rounded-xl">
@@ -875,18 +946,18 @@ const App: React.FC = () => {
                      ))}
                      <div className="p-10 glassmorphism rounded-[2.5rem] mt-10 text-center">
                         <div className="flex justify-between items-center font-black text-4xl mb-6 text-primary tracking-tighter"><span>Total:</span> <span>${cart.reduce((a,b) => a+(Number(b.precio)*Number(b.quantity)), 0).toFixed(2)}</span></div>
-                        <button onClick={() => setView('checkout')} className="w-full bg-primary text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-2xl hover:bg-accent transition-all active:scale-95">Continuar <ArrowRight size={24} /></button>
+                        <button onClick={() => setView('checkout')} className="w-full bg-primary text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-4 shadow-2xl hover:bg-accent transition-all active:scale-95">Ir al Checkout <ArrowRight size={24} /></button>
                      </div>
                   </div>
                 )}
              </div>
           )}
-          {view === 'checkout' && <CheckoutView onFinalize={finalizeOrder} />}
+          {view === 'checkout' && <CheckoutView carriers={carriers} onFinalize={finalizeOrder} />}
           {view === 'success' && currentOrder && (
             <div className="flex flex-col items-center justify-center py-32 px-6 text-center animate-fade-in">
                <div className="w-32 h-32 bg-green-50 rounded-full flex items-center justify-center mb-10 border border-green-100"><CheckCircle2 size={80} className="text-green-500" /></div>
-               <h2 className="text-5xl font-black mb-6 tracking-tighter text-primary">¡Pedido Enviado!</h2>
-               <p className="text-primary/50 mb-12 max-w-sm text-lg">Tu orden <strong>{currentOrder.order_id}</strong> ha sido enviada. Serás atendido por WhatsApp.</p>
+               <h2 className="text-5xl font-black mb-6 tracking-tighter text-primary">¡Pedido Exitoso!</h2>
+               <p className="text-primary/50 mb-12 max-w-sm text-lg">Tu orden <strong>{currentOrder.order_id}</strong> ha sido procesada. En segundos abrirá WhatsApp para coordinar.</p>
                <button onClick={() => setView('home')} className="bg-primary text-white px-16 py-5 rounded-2xl font-black text-xl shadow-2xl transition-all active:scale-95">Volver al Inicio</button>
             </div>
           )}
