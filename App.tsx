@@ -8,6 +8,7 @@ import {
   ShieldAlert, Users, Lock, UserPlus, Home, MessageCircle, Sparkles, 
   AlertCircle, Scale, ShieldCheck, FileText, Info, Wand2, Truck, User, Car, ChevronLeft
 } from 'lucide-react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 import { Product, CartItem, DepartmentSlug, Order, Config, Department, UnidadMedida, AdminUser } from './types';
 import { db, uploadImage } from './services/supabaseService';
@@ -697,6 +698,7 @@ const App: React.FC = () => {
           </button>
         </nav>
       </div>
+      <SpeedInsights />
     </HashRouter>
   );
 };
