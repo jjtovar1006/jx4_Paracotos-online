@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { Beef, Bird, Sandwich, Fish, Truck } from 'lucide-react';
-import { DepartmentSlug } from './types';
+import { DepartmentSlug } from './types.ts';
 
 export const DEPARTMENTS: { slug: DepartmentSlug; name: string; icon: React.ReactNode; color: string }[] = [
   { slug: 'carnes', name: 'Carnes', icon: <Beef size={24} />, color: '#ef4444' },

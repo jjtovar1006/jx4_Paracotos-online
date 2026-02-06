@@ -1,40 +1,41 @@
-
 import { GoogleGenAI } from "@google/genai";
 
-// Fix: Refactor to strictly follow GenAI initialization and text extraction guidelines
-export async function generateProductDescription(productName: string, category: string) {
+// Initialize the Google GenAI client with the API key from environment variables
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+/**
+ * Generates an engaging product description using Gemini 3 Flash.
+ * @param productName Name of the product to describe.
+ * @param category Category of the product.
+ * @returns A promise resolving to the generated text.
+ */
+export async function generateProductDescription(productName: string, category: string): Promise<string> {
   try {
-    // Correct initialization using named parameter and direct process.env.API_KEY access
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
-    // Using gemini-3-flash-preview for basic text tasks as per guidelines
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Escribe una descripción comercial corta y apetitosa (máximo 150 caracteres) para un producto llamado "${productName}" en la categoría de "${category}".`,
+      contents: `Escribe una descripción corta (máximo 120 caracteres) y llamativa para un producto de carnicería/charcutería llamado "${productName}" en la categoría "${category}". Destaca la frescura y el origen local de JX4 Paracotos.`,
     });
-    
-    // Correct: response.text is a property, not a method
-    return response.text || "Excelente producto garantizado.";
+    return response.text?.trim() || "Calidad y frescura garantizada en JX4 Paracotos.";
   } catch (error) {
-    console.error("Gemini Error:", error);
-    return "Excelente producto seleccionado por JX4 para ti.";
+    console.error("Error generating description:", error);
+    return "El mejor sabor para tu mesa, con la calidad de JX4.";
   }
 }
 
-export async function getCookingTip(productName: string) {
+/**
+ * Provides a quick culinary tip for the given product.
+ * @param productName Name of the product.
+ * @returns A promise resolving to a short cooking tip.
+ */
+export async function getCookingTip(productName: string): Promise<string> {
   try {
-    // Correct initialization using named parameter and direct process.env.API_KEY access
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Dame un tip rápido de cocina o uso para el producto "${productName}". Máximo 80 caracteres. Sé creativo y amable.`,
+      contents: `Dame un tip de cocina rápido y profesional para preparar "${productName}". Máximo 100 caracteres.`,
     });
-    
-    // Correct: response.text is a property, not a method
-    return response.text || "Cocina con pasión para obtener los mejores resultados.";
+    return response.text?.trim() || "Cocina a temperatura media para mantener la jugosidad.";
   } catch (error) {
-    console.error("Gemini Tip Error:", error);
-    return "Mantener en un lugar fresco y seco.";
+    console.error("Error getting cooking tip:", error);
+    return "Sellar bien la pieza antes de terminar la cocción para resaltar los sabores.";
   }
 }

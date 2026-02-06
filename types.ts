@@ -1,17 +1,6 @@
-
-export type DepartmentSlug = 'carnes' | 'aves' | 'embutidos' | 'pescados' | string;
+export type DepartmentSlug = 'carnes' | 'aves' | 'embutidos' | 'pescados' | 'transporte' | string;
 
 export type UnidadMedida = 'und' | 'kg' | 'gr' | 'caja' | 'paquete' | 'bulto' | 'saco' | 'metro' | 'litro' | 'docena';
-
-export type UserRole = 'super' | 'dept_admin';
-
-export interface AdminUser {
-  id?: string;
-  username: string;
-  password?: string;
-  role: UserRole;
-  dept_slugs?: DepartmentSlug[]; // Cambiado de dept_slug a dept_slugs (arreglo)
-}
 
 export interface Product {
   id?: string;
@@ -41,6 +30,15 @@ export interface Department {
   color_hex: string;
 }
 
+export interface Job {
+  id?: string;
+  titulo: string;
+  descripcion: string;
+  requisitos?: string;
+  activo: boolean;
+  created_at?: string;
+}
+
 export interface Order {
   id?: string;
   order_id: string;
@@ -49,14 +47,12 @@ export interface Order {
   productos: CartItem[];
   total: number;
   total_bs: number;
-  metodo_pago: string;
-  metodo_entrega: 'delivery' | 'retiro';
-  tipo_transporte?: 'moto' | 'carro' | 'camion';
+  tasa_aplicada: number;
+  metodo: 'delivery' | 'retiro';
+  transportista_nombre?: string;
   estado: 'pendiente' | 'confirmado' | 'entregado' | 'cancelado';
   departamento: DepartmentSlug;
   fecha_pedido: string;
-  direccion: string;
-  notas?: string;
 }
 
 export interface Config {

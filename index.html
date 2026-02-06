@@ -1,21 +1,39 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google" content="notranslate">
-  <!-- Control estricto de caché para evitar errores 404 en actualizaciones -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>JX4 Paracotos v11.5 - Sistema de Transporte</title>
+  <title>JX4 Paracotos - Catálogo Online</title>
   <script>
-    window.process = window.process || {};
-    window.process.env = {
-      NODE_ENV: 'production',
-      DATABASE_URL: 'postgresql://neondb_owner:npg_ApK0uye7xODV@ep-calm-cake-ahbbwe7i-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require',
-      API_KEY: '' 
+    window.process = {
+      env: {
+        NODE_ENV: 'production',
+        SUPABASE_URL: 'https://qaybhqvscdcdqpxrylnt.supabase.co',
+        SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFheWJocXZzY2RjZHFweHJ5bG50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk5ODg1MDQsImV4cCI6MjA4NTU2NDUwNH0.jSSFCXEpjryugA1O_P20ZXBsX-ZE_e5__66DX0ZksWc',
+        API_KEY: '' 
+      }
+    };
+    window.global = window;
+
+    window.onerror = function(msg, url, line, col, error) {
+      const root = document.getElementById('root');
+      if (root && root.innerHTML === "") {
+        root.innerHTML = `
+          <div style="padding: 40px; font-family: sans-serif; text-align: center; color: #3d4a3e; background: #f8f9f8; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <div style="background: white; padding: 40px; border-radius: 40px; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); max-width: 500px; width: 90%;">
+              <h2 style="font-weight: 800; font-size: 22px; margin-bottom: 10px;">Error de Inicialización</h2>
+              <p style="opacity: 0.6; font-size: 13px; margin-bottom: 20px;">No se pudieron cargar los módulos. Intenta recargar la página.</p>
+              <div style="text-align: left; background: #f1f1f1; padding: 15px; border-radius: 15px; font-size: 10px; overflow: auto; margin-bottom: 20px; font-family: monospace;">${msg}</div>
+              <button onclick="location.reload()" style="background: #3d4a3e; color: white; padding: 12px 24px; border-radius: 14px; border: none; font-weight: 700; cursor: pointer; width: 100%;">Reintentar Carga</button>
+            </div>
+          </div>
+        `;
+      }
+      return false;
     };
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -23,57 +41,30 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      background-color: #f8f9f8;
-      color: #3d4a3e;
-      margin: 0;
-      padding: 0;
-      -webkit-font-smoothing: antialiased;
-    }
-    .glassmorphism {
-      background: rgba(255, 255, 255, 0.8);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
+    :root { --primary: #3d4a3e; --accent: #f59e0b; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8f9f8; color: var(--primary); margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+    .glassmorphism { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.2); }
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
-    /* Custom scrollbar para la lista de transportistas */
-    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #d4a574; border-radius: 10px; }
+    .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+    .animate-scale-in { animation: scaleIn 0.3s ease-out forwards; }
+    .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
   </style>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: { DEFAULT: '#3d4a3e', light: '#5d6a5e', dark: '#2d3a2e' },
-            accent: { DEFAULT: '#d4a574', light: '#e4c5a4', dark: '#c49564' },
-            offwhite: { DEFAULT: '#f8f9f8', dark: '#e8e9e8' }
-          },
-          borderRadius: { 'xxl': '2.5rem' }
-        }
-      }
-    }
-  </script>
-<script type="importmap">
+  <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "react": "https://esm.sh/react@^19.2.4",
-    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "react-router-dom": "https://esm.sh/react-router-dom@6.28.0?external=react,react-dom",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0?external=react",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.46.1?external=react",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react-dom/client": "https://esm.sh/react-dom@^19.2.4/client",
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
-    "@neondatabase/serverless": "https://esm.sh/@neondatabase/serverless@^0.10.4"
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.40.0"
   }
 }
 </script>
