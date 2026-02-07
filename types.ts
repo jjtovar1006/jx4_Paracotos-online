@@ -5,16 +5,13 @@ export type UnidadMedida = 'und' | 'kg' | 'gr' | 'caja' | 'paquete' | 'bulto' | 
 export interface Product {
   id?: string;
   nombre: string;
-  descripcion: string;
+  descripcion?: string;
   precio: number;
-  stock: number;
-  imagen_url: string;
-  categoria: string;
+  imagen_url?: string;
   departamento: DepartmentSlug;
-  unidad: UnidadMedida;
-  peso_referencial: boolean;
   disponible: boolean;
   destacado: boolean;
+  created_at?: string;
 }
 
 export interface CartItem extends Product {
@@ -25,9 +22,8 @@ export interface Department {
   id?: string;
   nombre: string;
   slug: DepartmentSlug;
-  telefono_whatsapp: string;
-  activo: boolean;
-  color_hex: string;
+  telefono_whatsapp?: string;
+  created_at?: string;
 }
 
 export interface Job {
@@ -46,13 +42,12 @@ export interface Order {
   nombre_cliente: string;
   productos: CartItem[];
   total: number;
-  total_bs: number;
-  tasa_aplicada: number;
-  metodo: 'delivery' | 'retiro';
-  transportista_nombre?: string;
-  estado: 'pendiente' | 'confirmado' | 'entregado' | 'cancelado';
-  departamento: DepartmentSlug;
-  fecha_pedido: string;
+  total_bs?: number;
+  tasa_aplicada?: number;
+  metodo?: 'delivery' | 'retiro';
+  estado?: 'pendiente' | 'confirmado' | 'entregado' | 'cancelado';
+  departamento?: DepartmentSlug;
+  created_at?: string;
 }
 
 export interface Config {
