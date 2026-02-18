@@ -1,0 +1,27 @@
+En C:\Users\carlo\jx4\jx4-online\setup.ps1: 117 Carácter: 
+109
++ ... cutar 'npm run backend:dev' o 'npm run dev' dentro 
+de jx4-paracotos."
++                                                          
+               ~
+Falta la cadena en el terminador: ".
+En C:\Users\carlo\jx4\jx4-online\setup.ps1: 31 Carácter: 51
++         if (Test-Path -Path ".env.local.example") {
++                                                   ~
+Falta la llave de cierre "}" en el bloque de instrucciones 
+o la definición de tipo.
+En C:\Users\carlo\jx4\jx4-online\setup.ps1: 30 Carácter: 23
++     if ($AutoCopyEnv) {
++                       ~
+Falta la llave de cierre "}" en el bloque de instrucciones 
+o la definición de tipo.
+En C:\Users\carlo\jx4\jx4-online\setup.ps1: 29 Carácter: 42
++ if (-not (Test-Path -Path ".env.local")) {
++                                          ~
+Falta la llave de cierre "}" en el bloque de instrucciones 
+o la definición de tipo.
+    + CategoryInfo          : ParserError: (:) [], ParentC 
+   ontainsErrorRecordException
+    + FullyQualifiedErrorId : TerminatorExpectedAtEndOfStr 
+   ing
+ 

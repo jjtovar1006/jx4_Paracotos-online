@@ -1,0 +1,44 @@
+{
+  "name": "jx4-online",
+  "private": true,
+  "version": "10.0.6",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "update:repo": "git pull origin main",
+    "install:backend": "cd jx4-paracotos && npm install",
+    "start:db": "cd jx4-paracotos && npm run start:db",
+    "stop:db": "cd jx4-paracotos && npm run stop:db",
+    "migrate": "node jx4-paracotos/scripts/run-migrations.js",
+    "seed": "node jx4-paracotos/scripts/seed.js",
+    "check-seed": "node jx4-paracotos/scripts/check-seed.js",
+    "run:supabase": "powershell -ExecutionPolicy Bypass -File ./scripts/run-against-supabase.ps1",
+    "backend:dev": "cd jx4-paracotos && npm run dev",
+    "backend:build": "cd jx4-paracotos && npm run build",
+    "backend:test": "cd jx4-paracotos && npm run test",
+    "deploy:gas": "cd jx4-paracotos && npm run deploy:gas",
+    "login:gas": "cd jx4-paracotos && npm run login:gas",
+    "open:gas": "cd jx4-paracotos && npm run open:gas"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.0",
+    "lucide-react": "^0.460.0",
+    "@supabase/supabase-js": "^2.46.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15"
+  }
+}
